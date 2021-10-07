@@ -163,10 +163,10 @@ int main(void){
     LoadSettings();
 
     if(is_newfile == 'n'){
-    LoadData();
+        LoadData();
     }
     else{
-    InitData();
+        InitData();
     }
 
     // New_dir_table();
@@ -189,12 +189,12 @@ int main(void){
 void LoadSettings(){
     /* error handling for non existing files or content */
     if((fp_base = fopen(baseconf, "r")) == NULL){
-    fprintf(stderr, "%s not found or no content\n", baseconf);
-    exit(1);
+        fprintf(stderr, "%s not found or no content\n", baseconf);
+        exit(1);
     }
     if((fp_model = fopen(baseconf, "r")) == NULL){
-    fprintf(stderr, "%s not found or no content\n", modelconf);
-    exit(1);
+        fprintf(stderr, "%s not found or no content\n", modelconf);
+        exit(1);
     }
 
     /* values of settings.conf */
@@ -218,19 +218,19 @@ void LoadSettings(){
     fscanf(fp_model, "%lf%*[^\n]%*c", &detector_minradius);
     fscanf(fp_model, "%lf%*[^\n]%*c", &detector_maxradius);
     for(i = 0; i < MAX_DET; i++){
-    fscanf(fp_model, "%lf%*[^\n]%*c", &detector_x[i]);
-    fscanf(fp_model, "%lf%*[^\n]%*c", &detector_y[i]);
-    fscanf(fp_model, "%lf%*[^\n]%*c", &detector_z[i]);
-    fscanf(fp_model, "%lf%*[^\n]%*c", &detector_dx[i]);
-    fscanf(fp_model, "%lf%*[^\n]%*c", &detector_dy[i]);
-    fscanf(fp_model, "%lf%*[^\n]%*c", &detector_dz[i]);
+        fscanf(fp_model, "%lf%*[^\n]%*c", &detector_x[i]);
+        fscanf(fp_model, "%lf%*[^\n]%*c", &detector_y[i]);
+        fscanf(fp_model, "%lf%*[^\n]%*c", &detector_z[i]);
+        fscanf(fp_model, "%lf%*[^\n]%*c", &detector_dx[i]);
+        fscanf(fp_model, "%lf%*[^\n]%*c", &detector_dy[i]);
+        fscanf(fp_model, "%lf%*[^\n]%*c", &detector_dz[i]);
     }
 
     for(i = 0; i < MAX_LAYER; i++){
-    fscanf(fp_model, "%d%*[^\n]%*c", &thickness[i]);
-    fscanf(fp_model, "%lf%*[^\n]%*c", &mus[i]);
-    fscanf(fp_model, "%lf%*[^\n]%*c", &mua[i]);
-    mut[i] = mus[i] + mua[i];
+        fscanf(fp_model, "%d%*[^\n]%*c", &thickness[i]);
+        fscanf(fp_model, "%lf%*[^\n]%*c", &mus[i]);
+        fscanf(fp_model, "%lf%*[^\n]%*c", &mua[i]);
+        mut[i] = mus[i] + mua[i];
     }
 
     fclose(fp_base);
@@ -263,20 +263,20 @@ void InitData(){
 void LoadData(){
     /* error handling for non existing files or content */
     if((fp_note = fopen(note, "r")) == NULL){
-    fprintf(stderr, "%s not found or no content\n", note);
-    exit(1);
+        fprintf(stderr, "%s not found or no content\n", note);
+        exit(1);
     }
     if((fp_data = fopen(datafile, "rb")) == NULL){
-    fprintf(stderr, "%s not found or no content\n", datafile);
-    exit(1);
+        fprintf(stderr, "%s not found or no content\n", datafile);
+        exit(1);
     }
     if((fp_pd = fopen(pdfile, "rb")) == NULL){
-    fprintf(stderr, "%s not found or no content\n", pdfile);
-    exit(1);
+        fprintf(stderr, "%s not found or no content\n", pdfile);
+        exit(1);
     }
     if((fp_ssp = fopen(sspfile, "rb")) == NULL){
-    fprintf(stderr, "%s not found or no content\n", sspfile);
-    exit(1);
+        fprintf(stderr, "%s not found or no content\n", sspfile);
+        exit(1);
     }
 
     /* values of temporary_note.txt */
@@ -303,7 +303,7 @@ void LoadData(){
     /* values of binary.ssp */
     fread(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1), fp_ssp);
     fread(TSSP, sizeof(double), MAX_DET*MT_SSP*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1),
-    fp_ssp);
+          fp_ssp);
 
     fclose(fp_note);
     fclose(fp_data);
@@ -314,20 +314,20 @@ void LoadData(){
 void SaveData(){
     /* error handling for non existing files or content */
     if((fp_note = fopen(note, "w")) == NULL){
-    fprintf(stderr, "%s can not open\n", note);
-    exit(1);
+        fprintf(stderr, "%s can not open\n", note);
+        exit(1);
     }
     if((fp_data = fopen(datafile, "wb")) == NULL){
-    fprintf(stderr, "%s can not open\n", datafile);
-    exit(1);
+        fprintf(stderr, "%s can not open\n", datafile);
+        exit(1);
     }
     if((fp_pd = fopen(pdfile, "wb")) == NULL){
-    fprintf(stderr, "%s can not open\n", pdfile);
-    exit(1);
+        fprintf(stderr, "%s can not open\n", pdfile);
+        exit(1);
     }
     if((fp_ssp = fopen(sspfile, "wb")) == NULL){
-    fprintf(stderr, "%s can not open\n", sspfile);
-    exit(1);
+        fprintf(stderr, "%s can not open\n", sspfile);
+        exit(1);
     }
 
     /* values for temporary_note.txt */
@@ -349,19 +349,19 @@ void SaveData(){
     int x, y, z, t;
 
     for(z = 0; z < MAX_Z; z++){
-    for(x = 0; x < MAX_X * 2 + 1; x++){
-    PD[z][x] /= SCALE * SCALE * SCALE;
-    }
+        for(x = 0; x < MAX_X * 2 + 1; x++){
+            PD[z][x] /= SCALE * SCALE * SCALE;
+        }
     }
     for(t = 0; t < MT_PD; t++){
-    for(z = 0; z < MAX_Z; z++){
-    for (x = 0; x < MAX_X * 2 + 1; x++){
-    TPD[t][z][x] /= SCALE * SCALE * SCALE;
-    }
-    }
+        for(z = 0; z < MAX_Z; z++){
+            for (x = 0; x < MAX_X * 2 + 1; x++){
+                TPD[t][z][x] /= SCALE * SCALE * SCALE;
+            }
+        }
     }
     for(t = 0; t < 4000; t++){
-    STPD[t] /= SCALE * SCALE * SCALE;
+        STPD[t] /= SCALE * SCALE * SCALE;
     }
     fwrite(PD, sizeof(double), MAX_Z*MAX_X*2+1,fp_pd);
     fwrite(TPD, sizeof(double), MT_PD*MAX_Z*(MAX_X * 2 + 1), fp_pd);
@@ -370,7 +370,7 @@ void SaveData(){
     /* values for binary.ssp */
     fwrite(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1), fp_ssp);
     fwrite(TSSP, sizeof(double), MAX_DET*MT_SSP*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1),
-    fp_ssp);
+           fp_ssp);
 
     fclose(fp_note);
     fclose(fp_data);
@@ -383,11 +383,11 @@ void SetSeed(){
     time((time_t *) &time_now); /* sec since 00:00:00 1/1/1970 */
 
     for(j = 0; j < N; j++){
-    x[j] -= time_now;
+        x[j] -= time_now;
     }
 
     for(j = 0; j <= 150; j++){ /* exercise the system routine (???) */
-    GenRand();
+        GenRand();
     }
 }
 
@@ -395,13 +395,13 @@ double GenRand(){
     unsigned long y;
 
     if(k == N){
-    for(i = 0; i < N - M; i++){
-    x[i] = x[i+M] ^ (x[i] >> 1) ^ mag[x[i] % 2];
-    }
-    for(i = N - M; i < N; i++){
-    x[i] = x[i+M-N] ^ (x[i] >> 1) ^ mag[x[i] % 2];
-    }
-    k = 0;
+        for(i = 0; i < N - M; i++){
+            x[i] = x[i+M] ^ (x[i] >> 1) ^ mag[x[i] % 2];
+        }
+        for(i = N - M; i < N; i++){
+            x[i] = x[i+M-N] ^ (x[i] >> 1) ^ mag[x[i] % 2];
+        }
+        k = 0;
     }
 
     y = x[k];
