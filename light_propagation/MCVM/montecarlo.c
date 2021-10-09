@@ -24,13 +24,14 @@ adapted from mc_fnirs_slab.c written by K.Takai[2014]
 #define STRSIZE 50
 typedef char string[STRSIZE];
 
-static FILE   *fp_base, *fp_model, *fp_note, *fp_data, *fp_pd, *fp_ssp;
+static FILE   *fp_base, *fp_model, *fp_note, *fp_data, *fp_pd, *fp_ssp, *fp_com;
 static string baseconf = "settings.conf";
 static string modelconf = "model.conf";
 static string note = "temporary_note.txt";
 static string datafile = "binary.data";
 static string pdfile = "binary.pd";
 static string sspfile = "binary.ssp";
+static string comfile = "result.com";
 /* ========================================================================= */
 
 /* global variables to be altered ========================================== */
@@ -145,6 +146,58 @@ static double intensity[MAX_DET][MT];
 static double intensity_for_ssp[MAX_DET][MT_SSP];
 /* ========================================================================= */
 
+/*unsorted variables*/
+/* ========================================================================= */
+#define ref_ind		1.4
+
+static double	allpath;
+static double	CosT[TABLEN];		/* lookup table for new direction cosins */
+static double	SinT[TABLEN];		/* lookup table for new direction cosins */
+static double	CosP[TABLEN];		/* lookup table for new direction cosins */
+static double	SinP[TABLEN];		/* lookup table for new direction cosins */
+static double	Source_CosT[TABLEN];	/* lookup table for direction cosins at source*/
+static double	Source_SinT[TABLEN];	/* lookup table for direction cosins at source*/
+static double	Source_CosP[TABLEN];	/* lookup table for direction cosins at source*/
+static double	Source_SinP[TABLEN];	/* lookup table for direction cosins at source*/
+static double	NA_Cos[TABLEN];	/* lookup table for direction cosins at source*/
+static double	NA_Sin[TABLEN];	/* lookup table for direction cosins at source*/
+static double	LenTable[TABLEN];	/* lookup table for step size*/
+static double	intensity[MAX_DET][MT];
+static double	intensity_for_ssp[MAX_DET][MT_SSP];
+
+static double 	Ref_in[1001];	/* lookup table for reflection */
+static double 	Ref_out[1001];	/* lookup table for reflection */
+
+static int	inr;		/* flag for total internal reflection */
+static int	stop_fg;	/* flag to stop calc. (TRUE(1)orFALSE(0)) */
+static int	fg;			/* flag to stop random walk */
+static int	ref_fg;		/* flag to refrecliton*/
+static int	source_fg;
+static int	refx_fg;
+static int	refy_fg;
+static int	refz_fg;
+
+
+static double 	xold, yold, zold;	/* old x,y,z coordinates */
+static double	xnew, ynew, znew;	/* new x,y,z coordinates */
+static int		vox,voy,voz;
+
+static int		source_time;       /*[20180209�ǈ�]�Ǝˎ��Ԃ̈ʒu*/
+
+static double	cross_x, cross_y, cross_z;
+static int		layer_old,layer_new;
+static int		n_scatter;
+static double	Len;	/* free path lenght */
+static double	Lsub;
+static double	dx, dy, dz;	/* direction cosines */
+static double	sweight;		/* photon intensity for exit (mua=0) */
+static double	cweight;		/* photon intensity for continuation */
+
+static string angfile;
+/* ========================================================================= */
+/* ========================================================================= */
+
+
 /* subfunction declaration ================================================= */
 static void LoadSettings(); /* loads values from settings file */
 static void InitData(); /* initializes variables if file new */
@@ -152,6 +205,24 @@ static void LoadData(); /* loads variables if result partially recorded */
 static void SaveData(); /* saves variables to binary data */
 static void SetSeed();
 static double GenRand();
+
+static void Output_ref();
+static void Output_no_ref();
+static void Source_pos();
+static void Source_dir();
+static void Source_time();
+static void Source_dir_table();
+static void New_len();
+static void New_len_table();
+static void New_dir();
+static void New_dir_table();
+static void Ref_table();
+static void Check_layer(double z);
+static void Restore_voxelpath();
+static void Restore_data();
+static void Store_data();
+static void Fnstop();
+static void Main_mc();
 /* ========================================================================= */
 
 /* dummy variables ========================================================= */
@@ -169,18 +240,16 @@ int main(void){
         InitData();
     }
 
-    // New_dir_table();
-    // Source_dir_table();
-    // New_len_table();
-    // Ref_table();
+    New_dir_table();
+    Source_dir_table();
+    New_len_table();
+    Ref_table();
     SetSeed();
-    printf("%lf\n", GenRand());
-    printf("%lf\n", GenRand());
 
     time_start = time(NULL);
-    // Main_mc();
-    // Fnstop();
-    // SaveData();
+    Main_mc();
+    Fnstop();
+    SaveData();
 
     exit(0);
 }
@@ -413,4 +482,916 @@ double GenRand(){
     k++;
 
     return ((double) y / (unsigned long) 0xffffffff);
+}
+
+
+static void Main_mc(){
+	long time,time_max;
+	double pd;
+
+	time_max = MT * DT;
+
+	stop_fg = FALSE;
+
+	Fnstop();
+	do{
+		phot_in ++;
+		memset(path, 0, sizeof(path));
+		memset(path_y, 0, sizeof(path_y));
+		memset(path_for_ssp, 0, sizeof(path_for_ssp));
+		allpath=0.0;
+		source_fg = 0;
+
+		/*�� Source�̐ݒ肱������ ��*/
+		xold = source_x;
+		yold = source_y;
+		zold = source_z;
+		Source_pos();	//xold,yold,zold�̌���
+		Source_dir();	//du�̌���
+
+		Source_time(); //�Ǝˎ��Ԃ̌���
+
+		if(zold < 0){
+			printf("error in source\n");
+			printf("new position(x,y,z)=(%f,%f,%f)\n",xold,yold,zold);
+			exit(1);
+		}
+		Check_layer(zold);
+		New_len();	//Len�̌���
+
+		/*�� Source�̐ݒ肱���܂� ��*/
+
+		cweight = 1.0;
+		sweight = 0.0;
+		inr=0;
+		fg = FALSE;
+		n_scatter=0;
+		do{
+			n_scatter += 1;
+			Restore_voxelpath();
+			allpath += Len;
+			xnew = xold+Len*dx;
+			ynew = yold+Len*dy;
+			znew = zold+Len*dz;
+			time = (long)(allpath*ref_ind*SCALE/VC + source_time);
+			if (znew < 0){	/* photon exits */
+				Restore_data();		/* correct coordinates */
+				if (ref_fg == 1){
+					Output_ref();
+				}
+				else{
+					Output_no_ref();
+				}
+				if(inr == 0){
+					phot_out++;
+					Store_data();
+					if (cweight<INT_CUT){
+						fg = TRUE;
+					}
+				}
+
+				xold = xnew;
+				yold = ynew;
+				zold = znew;
+			}
+			else if (time > time_max){
+				phot_overtime++;
+				fg = TRUE;
+			}
+			else if (allpath*SCALE>=maxpath){	/* lost photon (cut off) */
+				phot_overpath++;
+				fg = TRUE;
+			}
+			else if (n_scatter >= MAX_SCATTER-1){
+				phot_overscat++;
+				fg = TRUE;
+			}
+			else{
+				xold = xnew;
+				yold = ynew;
+				zold = znew;
+
+				if ((voy == (int)source_y) && (vox >= -MAX_X) && (vox < MAX_X + 1) && (voz < MAX_Z)){
+					pd = cweight / mut[layer_new] * (mut[layer_new] - mus[layer_new]);
+					PD[voz][vox + MAX_X] += pd;
+				}
+
+
+			if ((PD_MIN_LINE == voy) && (vox >= -MAX_X) && (vox < MAX_X + 1) && (voz < MAX_Z)){
+					if ((int)(time / DT_PD) < MT_PD){
+						pd = cweight / mut[layer_new] * (mut[layer_new] - mus[layer_new]);
+						TPD[(int)(time / DT_PD)][voz][vox + MAX_X] += pd;
+					}
+				}
+
+
+				cweight = cweight*mus[layer_new]/mut[layer_new];
+
+				New_len();
+				New_dir();
+			}
+		} while (fg != TRUE);
+		if (phot_in % 100 == 0){
+			Fnstop();
+		}
+		if (phot_in % 10000000 == 0){
+			SaveData();
+		}
+	} while ((phot_in < phot_input) && (stop_fg!=TRUE));
+}
+
+static void Output_ref(){
+	/* calculate reflection and refraction in going from tissue to air. */
+	double refl, temp, n_ref1, n_ref2, n_ref3, trans_ratio, theta, duu, ds1, ds2, ds3;
+
+	duu = 0.0;
+	refx_fg = 0;
+	refy_fg = 0;
+	refz_fg = 1;
+
+	if(refx_fg == 1 && refy_fg == 0 && refz_fg == 0){
+	n_ref1 = -1.0*dx/fabs(dx);
+	n_ref2 = 0.0;
+	n_ref3 = 0.0;
+	//printf("n_ref1 = %lg \n",n_ref1);
+	}
+	else if(refx_fg == 0 && refy_fg == 1 && refz_fg == 0){
+		n_ref1 = 0.0;
+		n_ref2 = -1.0*dy/fabs(dy);
+		n_ref3 = 0.0;
+		//printf("n_ref2 = %lg \n",n_ref2);
+	}
+	else if(refx_fg == 0 && refy_fg ==0 && refz_fg == 1){
+		n_ref1 = 0.0;
+		n_ref2 = 0.0;
+		n_ref3 = -1.0*dz/fabs(dz);
+		//printf("n_ref3 = %lg \n",n_ref3);
+    }
+    else{
+		n_ref1 = -1.0 * dx;
+		n_ref2 = -1.0 * dy;
+		n_ref3 = -1.0 * dz;
+		//printf("else\n");
+	}
+
+	ds1 = -1.0 * dx;
+	ds2 = -1.0 * dy;
+	ds3 = -1.0 * dz;
+
+	theta = fabs(acos(ds1*n_ref1 + ds2*n_ref2 + ds3*n_ref3));
+
+	if(theta>(PI/2) || theta<0){
+		printf("dx = %g,dy = %lg, dz = %lg\n",dx,dy,dz);
+		printf("du = %lg\n",sqrt(dx*dx + dy*dy + dz*dz));
+		printf("theta=%lg\n",theta);
+		printf("Len=%lg\n\n",Len);
+	}
+
+	duu=(ds1*n_ref1 + ds2*n_ref2 + ds3*n_ref3);
+
+	dx = 2.0 * (ds1 * n_ref1 + ds2 * n_ref2 + ds3 * n_ref3) * n_ref1-ds1;
+	dy = 2.0 * (ds1 * n_ref1 + ds2 * n_ref2 + ds3 * n_ref3) * n_ref2-ds2;
+	dz = 2.0 * (ds1 * n_ref1 + ds2 * n_ref2 + ds3 * n_ref3) * n_ref3-ds3;
+
+	refl = Ref_out[(long)((fabs(duu * 1000)) + 0.5)];    /* calculate reflection */
+	trans_ratio = 1.0 - refl;
+
+	if (refl == 1)
+	inr = 1;                              /* total internal reflection */
+	else{
+		temp = 1-(1-duu*duu) * ref_ind*ref_ind;
+		if (temp < 0.0){                         /* can happen due to foundoff */
+			inr = 1;
+		}
+		else{
+			sweight = cweight * (1 - refl);
+			cweight = cweight * refl;
+			inr =0;
+		}
+	}
+}
+
+
+static void Output_no_ref(){
+	/* calculate direction cosines relevant to tangent plane */
+	sweight = cweight;
+	cweight = 0.0;
+	dx = -dx; //for acos in Store_data()
+	dy = -dy;
+	dz = -dz;
+}
+
+
+static void Source_pos(){
+	double rand1,rand2,radius,theta;
+
+	rand1 = GenRand();
+	radius = source_minradius + ((source_maxradius - source_minradius) * rand1);
+	rand2 = GenRand();
+	theta = 2 * PI * rand2;
+	if(source_dx == 1 || source_dx == -1){
+		yold = yold + radius * cos(theta);
+		zold = zold + radius * sin(theta);
+	}
+	else if(source_dy == 1 || source_dy == -1){
+		xold = xold - radius * cos(theta);
+		zold = zold + radius * sin(theta);
+	}
+	else if(source_dz == 1 || source_dz == -1){
+		xold = xold + radius * cos(theta);
+		yold = yold + radius * sin(theta);
+	}
+}
+
+
+static void Source_dir(){
+	/* calculate  direction vector at source (isotropic source)*/
+	long ir1, ir2;
+	double norm;
+
+	ir1 = (long)(GenRand()*((double)TABLEN-1.0));
+	ir2 = (long)(GenRand()*((double)TABLEN-1.0));
+
+	if(fabs(source_dz) > COSZERO) {   /* normal launch */
+		dx = Source_SinT[ir1]*Source_CosP[ir2];
+		dy = Source_SinT[ir1]*Source_SinP[ir2];
+		if(source_dz >= 0){
+			dz = Source_CosT[ir1];
+		}
+		else {
+			dz = - Source_CosT[ir1];
+		}
+	}
+	else {
+		double temp = sqrt(1.0 - source_dz*source_dz);
+		dx = Source_SinT[ir1] * (source_dx * source_dz * Source_CosP[ir2] - source_dy * Source_SinP[ir2]) / temp + source_dx * Source_CosT[ir1];
+		dy = Source_SinT[ir1] * (source_dy * source_dz * Source_CosP[ir2] + source_dx * Source_SinP[ir2]) / temp + source_dy * Source_CosT[ir1];
+		dz = -Source_SinT[ir1] * Source_CosP[ir2] * temp + source_dz * Source_CosT[ir1];
+	}
+	norm = sqrt(dx*dx + dy*dy + dz*dz);
+	dx /= norm;
+	dy /= norm;
+	dz /= norm;
+}
+
+
+/*[20180209�ǈ�]�Ǝˎ��Ԃ̈ʒu�̌���*/
+static void Source_time(){
+	double rand_time;
+
+	rand_time = GenRand();
+	if	(	0.00000000000000 	<=	rand_time	&&		rand_time	<=	1.00000000 	)	{	source_time	=	0	;	}
+
+
+
+
+}
+
+
+static void Source_dir_table(){	/*table for direction cosine in source*/
+	long	n;
+	double	theta, psi;
+
+	for(n=0;n<=TABLEN;n++){
+		theta = asin(source_NA)* n / (double)TABLEN;
+		Source_CosT[n] = cos(theta);
+		Source_SinT[n] = sqrt(1.0 - Source_CosT[n]*Source_CosT[n]);
+
+		psi = 2.0 * PI * n / (double)TABLEN;	/* spin psi 0-2pi. */
+		Source_CosP[n] = cos(psi);
+		if(psi<PI) {
+			Source_SinP[n] = sqrt(1.0 - Source_CosP[n] * Source_CosP[n]);
+		}
+		else {
+			Source_SinP[n] = - sqrt(1.0 - Source_CosP[n] * Source_CosP[n]);
+		}
+	}
+}
+
+
+static void New_len(){
+	long rand;
+
+	rand = (long)(GenRand()*((double)TABLEN-2.0));
+	Len = LenTable[rand] / mut[layer_new];
+	if(Len == 0){
+		printf("rand = %ld\nLen = %f\n",rand,LenTable[rand]);
+		Len = V0;
+	}
+}
+
+
+static void New_len_table(){
+	/*table for step size*/
+	long n;
+	double r;
+
+	for(n = 1; n < TABLEN; n++){
+		r = (double)n / (double)TABLEN;
+		LenTable[n-1] = -log(r) / SCALE;
+	}
+}
+
+
+static void New_dir(){
+	/* calculate new direction vector (isotropic scattering)*/
+	double dr1, dr2, dr3;     /* relative new direction cosines */
+	double dv1, dt3;
+	long ir1, ir2;
+
+	ir1 = (long)(GenRand()*((double)TABLEN-1.0));
+	ir2 = (long)(GenRand()*((double)TABLEN-1.0));
+
+	if (!strcmp(angfile,"isotropic")){
+		dx = SinT[ir1]*CosP[ir2];
+		dy = SinT[ir1]*SinP[ir2];
+		dz = CosT[ir1];
+	}
+	else{
+		dr1 = SinT[ir1]*CosP[ir2];
+		dr2 = SinT[ir1]*SinP[ir2];
+		dr3 = CosT[ir1];
+		dt3 = 1-dz*dz;
+		if (dt3>0){
+			dt3 = sqrt(dt3);
+			dv1 = (dx*dz*dr1-dy*dr2)/dt3+dx*dr3;
+			dy = (dy*dz*dr1+dx*dr2)/dt3+dy*dr3;
+			dz = dz*dr3-dt3*dr1;
+			dx = dv1;
+			return;
+		}
+		if (dz>0){            /* same direction, theta=0 */
+			dx = dr1;
+			dy = dr2;
+			dz = dr3;
+			return;
+		}
+		dx = -dr1;             /* oposit direction theta=180 deg.*/
+		dy = -dr2;
+		dz = -dr3;
+	}
+}
+
+
+static void New_dir_table(){
+	/* tables for new direction cosins */
+	long   n;
+	double rand, phy, c1, c2, c3, temp, Sin2T;
+
+	for (n=0; n<=TABLEN; n++){
+		rand = (double)n/(double)TABLEN;
+
+		if (!strcmp(angfile, "henyey-greenstein")){
+			c1 = 1.0+g*g;
+			temp = 1.0-g*g;
+			c2 = temp*temp;
+			temp = 1.0+g-2.0*g*rand;
+			c3 = temp*temp;
+			CosT[n] = (c1-c2/c3)/(2.0*g);
+			Sin2T = 1.0-CosT[n]*CosT[n];
+			if (Sin2T<=0){
+				SinT[n] = 0.0;
+			}
+			else{
+				SinT[n] = sqrt(Sin2T);
+			}
+		}
+		else{	/* isotropic */
+			CosT[n] = 1.0-2.0*rand;
+			SinT[n] = sqrt(1.0-CosT[n]*CosT[n]);
+		}
+		phy = n*2.0*(double)PI/(double)TABLEN;
+		CosP[n] = cos(phy);
+		SinP[n] = sin(phy);
+	}
+}
+
+
+static void Ref_table(){
+	/* lookup table of reflection */
+	long i;
+	double t1, t2, t3, t4;
+	double th1, th2;
+
+	if(ref_fg==0){
+		for(i=0; i<=1000; i++){
+			Ref_in[i]=0;
+			Ref_out[i]=0;
+		}
+	}
+
+	else if(ref_fg==1){
+		t1=(ref_ind-1)/(ref_ind+1);
+		Ref_in[1000]=t1*t1;
+		Ref_out[1000]=Ref_in[1000];
+		Ref_in[0]=1;
+		Ref_out[0]=1;
+		for(i=1; i<1000; i++){
+			t1=(double)i/1000;   /* cos(theta) */
+			t2=sqrt(1-t1*t1);    /* sin(theta) */
+			th1=atan2(t2,t1);
+			t2=t2/ref_ind;
+			th2=atan2(t2,sqrt(1-t2*t2));
+			t1=sin(th1-th2);
+			t2=sin(th1+th2);
+			t3=cos(th1-th2);
+			t4=cos(th1+th2);
+
+			/* R = 1/2*[sin(th1-th2)^2/sin(th1+th2)^2 + tan(th1-th2)^2/tan(th1+th2)^2] */
+			Ref_in[i]=0.5*t1*t1/(t2*t2)*(1+t4*t4/(t3*t3));
+			t1=(double)i/1000;
+			t1=sqrt(1-t1*t1)*ref_ind;
+			if(t1>=1){
+				Ref_out[i]=1;
+			}
+			else {
+				th2=atan2(t1,sqrt(1-t1*t1));
+				t1=sin(th1-th2);
+				t2=sin(th1+th2);
+				t3=cos(th1-th2);
+				t4=cos(th1+th2);
+				Ref_out[i]=0.5*t1*t1/(t2*t2)*(1+t4*t4/(t3*t3));
+			}
+		}
+	}
+	else if(ref_fg==2){
+		for(i=0; i<=1000; i++){
+			Ref_in[i]=0;
+			t1=(double)i/1000;
+			t1=(sqrt(1-t1*t1))*ref_ind;
+			if (t1>=1.0){
+				Ref_out[i]=1;
+			}
+			else{
+				Ref_out[i]=0;
+			}
+		}
+	}
+	else {
+		printf("error in ref_fg\n");
+		exit(1);
+	}
+}
+
+
+static void Check_layer(double z){
+	int layer_num,layer_min;
+	layer_min = 0;
+	if(z < 0){
+		printf("ERROR:z = %f\n", z);
+		exit(1);
+	}
+	for(layer_num = 0; layer_num < MAX_LAYER; layer_num++){
+		if(z >= layer_min && z < (layer_min + thickness[layer_num])){
+			layer_new = layer_num;
+			break;
+		}
+		else if(layer_num == MAX_LAYER - 1){
+			layer_new = layer_num;
+		}
+		else{
+			layer_min += thickness[layer_num];
+		}
+	}
+}
+
+
+static void Restore_voxelpath(){
+	int n,restore_fg;
+	double xoldtemp, yoldtemp, zoldtemp;
+	double L,L_temp,Lx,Ly,Lz;
+
+	restore_fg = 0;
+	L_temp = 0.0;
+	xoldtemp = xold;
+	yoldtemp = yold;
+	zoldtemp = zold;
+	if(xoldtemp < 0){	vox = (int)(xoldtemp) - 1;}
+	else{				vox = (int)(xoldtemp);}
+	if(yoldtemp < 0){	voy = (int)(yoldtemp) - 1;}
+	else{				voy = (int)(yoldtemp);}
+	voz = (int)(zoldtemp);
+	n = 0;
+	L = Len;
+
+	do{
+		Check_layer(zoldtemp);
+		layer_old = layer_new;
+
+		refx_fg = 0;
+		refy_fg = 0;
+		refz_fg = 0;
+
+		if(dx > 0){
+			Lx = ((double)vox+1.0-xoldtemp)/dx;
+		}
+		else if (dx < 0) {
+			Lx = ((double)vox-xoldtemp)/dx;
+		}
+		else if(dx==0) {
+			Lx=1.0/0.0;
+		}
+
+		if(dy > 0){
+			Ly= ((double)voy+1.0-yoldtemp)/dy;
+		}
+	    else if(dy < 0){
+			Ly= ((double)voy-yoldtemp)/dy;
+		}
+		else if(dy==0){
+			Ly=1.0/0.0;
+		}
+
+		if(dz > 0){
+			Lz= ((double)voz+1.0-zoldtemp)/dz;
+		}
+		else if (dz < 0) {
+			Lz= ((double)voz-zoldtemp)/dz;
+		}
+		else if(dz == 0) {
+			Lz=1.0/0.0;
+		}
+
+		if ((Lx < Ly) && (Lx < Lz) && (Lx <= L)){
+			L_temp += Lx;
+			path[layer_old] += Lx;
+			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Lx;
+
+			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+
+				path_y[layer_old] += Lx;
+			}
+				}
+
+
+			L = L - Lx;
+			refx_fg = 1;
+			xoldtemp = xoldtemp+Lx*dx;
+			yoldtemp = yoldtemp+Lx*dy;
+			zoldtemp = zoldtemp+Lx*dz;
+			if (dx>0){
+			  vox +=1;
+			}
+			else if(dx<0){
+				vox -=1;
+			}
+		}
+		else if((Ly < Lx) && (Ly < Lz) && (Ly <= L)){
+			L_temp += Ly;
+			path[layer_old] += Ly;
+			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Ly;
+
+			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+				path_y[layer_old] += Ly;
+			}
+			}
+			L = L - Ly;
+			refy_fg = 1;
+			xoldtemp = xoldtemp+Ly*dx;
+			yoldtemp = yoldtemp+Ly*dy;
+			zoldtemp = zoldtemp+Ly*dz;
+			if (dy > 0){
+				voy +=1;
+			}
+			else if (dy < 0){
+				voy -=1;
+			}
+		}
+		else if((Lz < Lx) && (Lz < Ly) && (Lz <= L)){
+			L_temp += Lz;
+			path[layer_old] += Lz;
+			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Lz;
+
+			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+				path_y[layer_old] += Lz;
+			}
+			}
+			L = L - Lz;
+			refz_fg = 1;
+			xoldtemp = xoldtemp+Lz*dx;
+			yoldtemp = yoldtemp+Lz*dy;
+			zoldtemp = zoldtemp+Lz*dz;
+			if (dz>0){
+			    voz +=1;
+			}
+			else if(dz < 0){
+			    voz -=1;
+			}
+		}
+		else if((Lx == Ly) && (Lx < Lz) && (Lx <= L)){
+			L_temp += Lx;
+			path[layer_old] += Lx;
+			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Lx;
+
+			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+
+				path_y[layer_old] += Lx;
+			}
+			}
+			L = L - Lx;
+			refx_fg = 1;
+			refy_fg = 1;
+			xoldtemp = xoldtemp+Lx*dx;
+			yoldtemp = yoldtemp+Lx*dy;
+			zoldtemp = zoldtemp+Lx*dz;
+			if (dx>0){
+				vox +=1;
+			}
+			else if(dx<0){
+				vox -=1;
+			}
+			if (dy>0){
+				voy +=1;
+			}
+			else if(dy<0){
+				voy -=1;
+			}
+		}
+		else if((Lx == Lz) && (Lx < Ly) && (Lx <= L)){
+			L_temp += Lx;
+			path[layer_old] += Lx;
+			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Lx;
+
+			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+				path_y[layer_old] += Lx;
+			}
+			}
+			L = L - Lx;
+			refx_fg = 1;
+			refz_fg = 1;
+			xoldtemp = xoldtemp+Lx*dx;
+			yoldtemp = yoldtemp+Lx*dy;
+			zoldtemp = zoldtemp+Lx*dz;
+			if (dx>0){
+				vox +=1;
+			}
+			else if(dx<0){
+				vox -=1;
+			}
+			if (dz>0){
+				voz +=1;
+			}
+			else if(dz<0){
+				voz -=1;
+			}
+		}
+		else if((Ly == Lz) && (Ly < Lx) && (Ly <= L)){
+			L_temp += Ly;
+			path[layer_old] += Ly;
+			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Ly;
+
+			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+
+				path_y[layer_old] += Ly;
+			}
+			}
+			L = L - Ly;
+			refy_fg = 1;
+			refz_fg = 1;
+			xoldtemp = xoldtemp+Ly*dx;
+			yoldtemp = yoldtemp+Ly*dy;
+			zoldtemp = zoldtemp+Ly*dz;
+			if (dy>0){
+				voy +=1;
+			}
+			else if(dy<0){
+				voy -=1;
+			}
+			if (dz>0){
+				voz +=1;
+			}
+			else if(dz<0){
+				voz -=1;
+			}
+		}
+		else if((Lx == Ly) && (Ly == Lz) && (Lz == Lx) && (Lx <= L)){
+			L_temp += Lx;
+			path[layer_old] += Lx;
+			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Lx;
+
+			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+
+				path_y[layer_old] += Lx;
+			}
+			}
+			L = L - Lx;
+			refx_fg = 1;
+			refy_fg = 1;
+			refz_fg = 1;
+			xoldtemp = xoldtemp+Lx*dx;
+			yoldtemp = yoldtemp+Lx*dy;
+			zoldtemp = zoldtemp+Lx*dz;
+
+			if (dx>0){
+				vox +=1;
+			}
+			else if(dx<0){
+				vox -=1;
+			}
+			if (dy>0){
+				voy +=1;
+			}
+			else if(dy < 0){
+				voy -=1;
+			}
+			if (dz>0){
+				voz +=1;
+			}
+			else if(dz < 0){
+				voz -=1;
+			}
+		}
+		else if((L < Lx) && (L < Ly) && (L < Lz)){
+			L_temp += L;
+			path[layer_old] += L;
+			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += L;
+
+			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
+
+				path_y[layer_old] += L;
+			}
+			}
+			L=0.0;
+			restore_fg = 1;
+		}
+		else {
+			printf("ERROR\n");
+		}
+
+		if(voz < 0){
+			L_temp +=L;
+			restore_fg = 1;
+			zoldtemp = 0;
+			cross_x = xoldtemp;
+			cross_y = yoldtemp;
+			cross_z = zoldtemp;
+		}
+		if(zoldtemp < 0){
+			printf("Restore_ERROR\nzoldtemp = %f,voz = %d\n",zoldtemp,voz);
+			exit(1);
+		}
+		Check_layer(zoldtemp);
+		if(layer_new != layer_old){
+			L = L*mut[layer_old]/mut[layer_new];
+		}
+	}while(restore_fg == 0);
+
+	Len = L_temp;
+}
+
+
+static void Restore_data(){
+	/* correct total pathlength and find rigth X- and Y coordinates */
+	Lsub = sqrt((xnew - cross_x)*(xnew -cross_x) + (ynew - cross_y)*(ynew -cross_y) + (znew - cross_z)*(znew - cross_z));
+	allpath -= Lsub;
+	Len = Lsub;
+
+	if (Len == 0){
+		Len = (double)V0;
+		Len = -(log(Len)/mut[0])/SCALE;
+	}
+
+	xnew= cross_x;
+	ynew= cross_y;
+	znew= cross_z;
+}
+
+static void Store_data(){
+	int		i,j,x,y,z;
+	long	time,time_SSP;
+	double	d1,d2,inner_product,theta;
+
+	time = labs((long)(((allpath*ref_ind)*SCALE / VC + source_time )/ DT));
+	time_SSP = labs((long)(((allpath*ref_ind)*SCALE / VC + source_time) / DT_SSP));
+
+/*	if (source_time == 1){
+		printf("sorce_time_ok\n");
+
+	}
+*/
+	for(i = 0; i < MAX_DET; i++){
+		inner_product = detector_dx[i] * dx + detector_dy[i] * dy + detector_dz[i] * dz;
+		theta = acos(inner_product);
+
+		if(detector_dz[i] == 1 || detector_dz[i] == -1){
+			d1 = (detector_x[i] - xnew) * (detector_x[i] - xnew);
+			d2 = (detector_y[i] - ynew) * (detector_y[i] - ynew);
+		}
+
+		if(sqrt(d1+d2) >= (double)detector_minradius/SCALE && sqrt(d1+d2) <= (double)detector_maxradius/SCALE && theta <= asin(detector_NA)){
+			phot_detected++;
+			for (j=0; j<MAX_LAYER; j++){
+				ppath[i][j] += sweight*path[j]*SCALE;
+
+				if((time >= 0) && (time < MT)){
+					tppath[i][time][j] += sweight*path[j]*SCALE;
+					tppath_y[i][time][j] += sweight*path_y[j] * SCALE;
+				}
+			}
+			for(z=0;z<MAX_Z;z++){
+				for(x=0;x<MAX_X*2;x++){
+									for(y=0;y<=MAX_Y*2;y++){
+					SSP[i][z][x][y] += sweight * path_for_ssp[z][x][y] * SCALE;
+									}
+				}
+			}
+			if((time_SSP >= 0) && (time_SSP < MT_SSP)){
+				intensity_for_ssp[i][time_SSP] += sweight;
+				for(z=0;z<MAX_Z;z++){
+					for(x=0;x<MAX_X*2;x++){
+						for(y=0;y<=MAX_Y*2;y++){
+						TSSP[i][time_SSP][z][x][y] += sweight * path_for_ssp[z][x][y] * SCALE;
+						}
+					}
+				}
+			}
+
+			if((time >= 0) && (time <MT)){
+				intensity[i][time] += sweight;
+			}
+			return;
+		}
+	}
+}
+
+
+static void Fnstop(){
+	char  ch;
+	int i;
+	unsigned long long int sec;
+	int month,day,hour,min;
+
+	time_end = time(NULL);
+	phot_end = phot_in;
+	sec = (double)(time_end - time_start)/(double)(phot_end - phot_start)*1000000000.0;
+	if((phot_end - phot_start) == 0){
+		sec = 0;
+	}
+	month = sec / (60*60*24*30);
+	sec = sec % (60*60*24*30);
+	day = sec / (60*60*24);
+	sec = sec % (60*60*24);
+	hour = sec / (60*60);
+	sec = sec % (60*60);
+	min = sec / 60;
+	sec = sec % 60;
+
+	fp_com = fopen(comfile, "r");
+	if (fp_com == NULL){
+		fprintf(stderr,"comfile can not open\n");
+		exit(1);
+	}
+
+	fscanf(fp_com, "%c%*[^\n]", &ch);
+	getc(fp_com);
+	fclose(fp_com);
+
+	fp_com = fopen(comfile, "w");
+	if (fp_com == NULL){
+		fprintf(stderr,"comfile can not open\n");
+		exit(1);
+	}
+
+	fprintf(fp_com, "<This file is created by 'mc_fnirs_slab.c'>\n");
+	fprintf(fp_com, "number of input photons \t %12llu\n", phot_in);
+	fprintf(fp_com, "number of output photons \t %12llu\n", phot_out);
+	fprintf(fp_com, "number of detect photons \t %12llu\n", phot_detected);
+	fprintf(fp_com, "number of over time photon \t %12llu\n", phot_overtime);
+	fprintf(fp_com, "number of over path photon \t %12llu\n", phot_overpath);
+	fprintf(fp_com, "number of over scatter photon \t %12llu\n", phot_overscat);
+	fprintf(fp_com, "estimate time of 1B photon = %dM, %dD, %dH, %dM, %lluS\n\n",month,day,hour,min,sec);
+
+	fprintf(fp_com, "Layer Num\tThickness\tmus\tmua\n");
+	for (i=0;i<MAX_LAYER;i++){
+		fprintf(fp_com, "%d\t\t%d\t\t%6.4f\t%6.4f\n", i, thickness[i], mus[i], mua[i]);
+	}
+
+	fprintf(fp_com, "\nPhase function\t: %s (g = %.1lf)\n", angfile,g);
+	fprintf(fp_com, "Source NA\t: %.1f\n", source_NA);
+	fprintf(fp_com, "Source radius\t: Min = %.1f\tMax = %.1f\n", source_minradius, source_maxradius);
+	fprintf(fp_com, "Source\t\t: (x = %.1f, y = %.1f, z = %.1f)\n", source_x,source_y,source_z);
+	fprintf(fp_com, "Detector NA\t: %.1f\n", detector_NA);
+	fprintf(fp_com, "Detector radius\t: Min = %.1f\tMax = %.1f\n", detector_minradius,detector_maxradius);
+	for(i = 0; i < MAX_DET; i++){
+		fprintf(fp_com, "Detector[%d]\t: (x = %.1f, y = %.1f, z = %.1f)\n", i, detector_x[i], detector_y[i], detector_z[i]);
+	}
+
+	if ((ch=='y')||(ch=='Y'))
+	{
+		stop_fg = TRUE;
+		fprintf(fp_com, "stop request");
+	}
+	else{
+		stop_fg = FALSE;
+	}
+
+	fclose(fp_com);
 }
