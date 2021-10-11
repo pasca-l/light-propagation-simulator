@@ -56,12 +56,10 @@ static string comfile = "result.com";
 #define DT_SSP      250
 #define INT_CUT     0.0001   /* cutoff intensity for cweight */
 #define MAX_SCATTER 100000
-#define TABLEN      10000    /* length of lookup table for new direction cos */
 /* ========================================================================= */
 
 /* global variables as constants =========================================== */
 #define VC          0.3  /* speed of light in vacuum (mm/psec) */
-#define REF_IND     1.4
 
 #define PI          3.14159265358979324
 #define DEG_RAD     (PI / 180.0)
@@ -146,32 +144,44 @@ static double intensity[MAX_DET][MT];
 static double intensity_for_ssp[MAX_DET][MT_SSP];
 /* ========================================================================= */
 
+/* variables for precalculation ============================================ */
+#define TABLEN  10000 /* size of table */
+#define REF_IND 1.4
+
+static double stepsize_table[TABLEN];
+static double source_costhe[TABLEN];
+static double source_sinthe[TABLEN];
+static double source_cospsi[TABLEN];
+static double source_sinpsi[TABLEN];
+static double costhe[TABLEN];
+static double sinthe[TABLEN];
+static double cospsi[TABLEN];
+static double sinpsi[TABLEN];
+
+static int ref_fg;
+static double ref_in[1001];
+static double ref_out[1001];
+/* ========================================================================= */
+
+
+/* variables for monte carlo part ========================================== */
+static int	stop_fg;     /* flag to stop calculation */
+/* ========================================================================= */
+
+
+
 /*unsorted variables*/
 /* ========================================================================= */
 #define ref_ind		1.4
 
 static double	allpath;
-static double	CosT[TABLEN];		/* lookup table for new direction cosins */
-static double	SinT[TABLEN];		/* lookup table for new direction cosins */
-static double	CosP[TABLEN];		/* lookup table for new direction cosins */
-static double	SinP[TABLEN];		/* lookup table for new direction cosins */
-static double	Source_CosT[TABLEN];	/* lookup table for direction cosins at source*/
-static double	Source_SinT[TABLEN];	/* lookup table for direction cosins at source*/
-static double	Source_CosP[TABLEN];	/* lookup table for direction cosins at source*/
-static double	Source_SinP[TABLEN];	/* lookup table for direction cosins at source*/
 static double	NA_Cos[TABLEN];	/* lookup table for direction cosins at source*/
 static double	NA_Sin[TABLEN];	/* lookup table for direction cosins at source*/
-static double	LenTable[TABLEN];	/* lookup table for step size*/
 static double	intensity[MAX_DET][MT];
 static double	intensity_for_ssp[MAX_DET][MT_SSP];
 
-static double 	Ref_in[1001];	/* lookup table for reflection */
-static double 	Ref_out[1001];	/* lookup table for reflection */
-
 static int	inr;		/* flag for total internal reflection */
-static int	stop_fg;	/* flag to stop calc. (TRUE(1)orFALSE(0)) */
 static int	fg;			/* flag to stop random walk */
-static int	ref_fg;		/* flag to refrecliton*/
 static int	source_fg;
 static int	refx_fg;
 static int	refy_fg;
@@ -205,18 +215,15 @@ static void LoadData(); /* loads variables if result partially recorded */
 static void SaveData(); /* saves variables to binary data */
 static void SetSeed();
 static double GenRand();
+static void PreCalculatedTable(); /* creates table of precalculated values */
 
 static void Output_ref();
 static void Output_no_ref();
 static void Source_pos();
 static void Source_dir();
 static void Source_time();
-static void Source_dir_table();
 static void New_len();
-static void New_len_table();
 static void New_dir();
-static void New_dir_table();
-static void Ref_table();
 static void Check_layer(double z);
 static void Restore_voxelpath();
 static void Restore_data();
@@ -227,6 +234,8 @@ static void Main_mc();
 
 /* dummy variables ========================================================= */
 long i, j;
+double temp;
+static char ch = 'n';
 /* ========================================================================= */
 
 
@@ -240,10 +249,7 @@ int main(void){
         InitData();
     }
 
-    New_dir_table();
-    Source_dir_table();
-    New_len_table();
-    Ref_table();
+    PreCalculatedTable();
     SetSeed();
 
     time_start = time(NULL);
@@ -270,6 +276,7 @@ void LoadSettings(){
     fscanf(fp_base, "%c%*[^\n]%*c", &is_newfile);
     fscanf(fp_base, "%llu%*[^\n]%*c", &phot_input);
     fscanf(fp_base, "%lf%*[^\n]%*c", &g);
+    fscanf(fp_base, "%d%*[^\n]%*c", &ref_fg);
     fscanf(fp_base, "%lf%*[^\n]%*c", &maxpath);
 
     /* values of model.conf */
@@ -484,6 +491,123 @@ double GenRand(){
     return ((double) y / (unsigned long) 0xffffffff);
 }
 
+void PreCalculatedTable(){
+    /* table for step size */
+    for(i = 1; i < TABLEN; i++){
+        stepsize_table[i-1] = -log((double) i / TABLEN) / SCALE;
+    }
+
+    /* table for direction at source */
+    double theta, psi;
+    for(i = 0; i <= TABLEN; i++){
+        theta = asin(source_NA) * i / (double)TABLEN;
+        psi = 2 * PI * i / (double)TABLEN;
+
+        source_costhe[i] = cos(theta);
+        source_cospsi[i] = cos(psi);
+        source_sinthe[i] = sqrt(1 - source_costhe[i] * source_costhe[i]);
+        source_sinpsi[i] = sqrt(1 - source_cospsi[i] * source_cospsi[i]);
+        if(psi > PI){
+            source_sinpsi[i] = -1 * source_sinpsi[i];
+        }
+    }
+
+    /* table for new direction */
+    double c1, c2, c3;
+    for(i = 0; i <= TABLEN; i++){
+        j = (double) i / TABLEN;
+
+        if(g == 0){
+            costhe[i] = 1 - 2 * j;
+            sinthe[i] = sqrt(1 - costhe[i] * costhe[i]);
+        }
+        else{
+            c1 = 1 + g * g;
+            c2 = (1 - g * g) * (1 - g * g);
+            c3 = (1 + g - 2 * g * j) * (1 + g - 2 * g * j);
+
+            costhe[i] = (c1 - c2 / c3) / (2 * g);
+            if(1 - costhe[i] * costhe[i] <= 0){
+                sinthe[i] = 0;
+            }
+            else{
+                sinthe[i] = sqrt(1 - costhe[i] * costhe[i]);
+            }
+        }
+
+        psi = 2 * PI * i / (double)TABLEN;
+        cospsi[i] = cos(psi);
+        sinpsi[i] = sin(psi);
+    }
+
+    /* table for reflection */
+    double t1, t2, t3, t4, th1, th2;
+    if(ref_fg == 0){
+        for(i = 0; i <= 1000; i++){
+            ref_in[i] = 0;
+            ref_out[i] = 0;
+        }
+    }
+    else if(ref_fg == 1){
+        t1 = (REF_IND - 1) / (REF_IND + 1);
+
+        ref_in[0] = 1;
+        ref_out[0] = 1;
+        ref_in[1000] = t1 * t1;
+        ref_out[1000] = ref_in[1000];
+
+        for(i = 1; i < 1000; i++){
+            /* calculating ref_in values */
+            t1 = (double) i / 1000;
+            t2 = sqrt(1 - t1 * t1);
+
+            th1 = atan2(t2, t1);
+            t2 = t2 / REF_IND;
+            th2 = atan2(t2, sqrt(1 - t2 * t2));
+
+            t1 = sin(th1 - th2);
+            t2 = sin(th1 + th2);
+            t3 = cos(th1 - th2);
+            t4 = cos(th1 + th2);
+
+            ref_in[i] = 0.5 * t1 * t1 / (t2 * t2) * (1 + t4 * t4 / (t3 * t3));
+
+            /* calculating ref_out values */
+            t1 = (double) i / 1000;
+            t1 = sqrt(1 - t1 * t1) * REF_IND;
+            if(t1 >= 1){
+                ref_out[i] = 1;
+            }
+            else{
+                th2 = atan2(t1, sqrt(1 - t1 * t1));
+                t1 = sin(th1 - th2);
+                t2 = sin(th1 + th2);
+                t3 = cos(th1 - th2);
+                t4 = cos(th1 + th2);
+                ref_out[i] = 0.5 * t1 * t1 / (t2 * t2) * (1 + t4 * t4 /
+                                                                    (t3 * t3));
+            }
+        }
+    }
+    else if(ref_fg == 2){
+        for(i = 0; i <= 1000; i++){
+            ref_in[i] = 0;
+            t1 = (double) i / 1000;
+            t1 = sqrt(1 - t1 * t1) * REF_IND;
+            if(t1 >= 1){
+                ref_out[i] = 1;
+            }
+            else{
+                ref_out[i] = 0;
+            }
+        }
+    }
+    else{
+        printf("error: value of ref_fg not valid\n");
+        exit(1);
+    }
+}
+
 
 static void Main_mc(){
 	long time,time_max;
@@ -550,6 +674,7 @@ static void Main_mc(){
 					}
 				}
 
+
 				xold = xnew;
 				yold = ynew;
 				zold = znew;
@@ -567,6 +692,7 @@ static void Main_mc(){
 				fg = TRUE;
 			}
 			else{
+
 				xold = xnew;
 				yold = ynew;
 				zold = znew;
@@ -597,7 +723,11 @@ static void Main_mc(){
 		if (phot_in % 10000000 == 0){
 			SaveData();
 		}
+        if (phot_in < phot_input){
+            ch = 'y';
+        }
 	} while ((phot_in < phot_input) && (stop_fg!=TRUE));
+
 }
 
 static void Output_ref(){
@@ -653,7 +783,7 @@ static void Output_ref(){
 	dy = 2.0 * (ds1 * n_ref1 + ds2 * n_ref2 + ds3 * n_ref3) * n_ref2-ds2;
 	dz = 2.0 * (ds1 * n_ref1 + ds2 * n_ref2 + ds3 * n_ref3) * n_ref3-ds3;
 
-	refl = Ref_out[(long)((fabs(duu * 1000)) + 0.5)];    /* calculate reflection */
+	refl = ref_out[(long)((fabs(duu * 1000)) + 0.5)];    /* calculate reflection */
 	trans_ratio = 1.0 - refl;
 
 	if (refl == 1)
@@ -713,20 +843,20 @@ static void Source_dir(){
 	ir2 = (long)(GenRand()*((double)TABLEN-1.0));
 
 	if(fabs(source_dz) > COSZERO) {   /* normal launch */
-		dx = Source_SinT[ir1]*Source_CosP[ir2];
-		dy = Source_SinT[ir1]*Source_SinP[ir2];
+		dx = source_sinthe[ir1]*source_cospsi[ir2];
+		dy = source_sinthe[ir1]*source_sinpsi[ir2];
 		if(source_dz >= 0){
-			dz = Source_CosT[ir1];
+			dz = source_costhe[ir1];
 		}
 		else {
-			dz = - Source_CosT[ir1];
+			dz = - source_costhe[ir1];
 		}
 	}
 	else {
 		double temp = sqrt(1.0 - source_dz*source_dz);
-		dx = Source_SinT[ir1] * (source_dx * source_dz * Source_CosP[ir2] - source_dy * Source_SinP[ir2]) / temp + source_dx * Source_CosT[ir1];
-		dy = Source_SinT[ir1] * (source_dy * source_dz * Source_CosP[ir2] + source_dx * Source_SinP[ir2]) / temp + source_dy * Source_CosT[ir1];
-		dz = -Source_SinT[ir1] * Source_CosP[ir2] * temp + source_dz * Source_CosT[ir1];
+		dx = source_sinthe[ir1] * (source_dx * source_dz * source_cospsi[ir2] - source_dy * source_sinpsi[ir2]) / temp + source_dx * source_costhe[ir1];
+		dy = source_sinthe[ir1] * (source_dy * source_dz * source_cospsi[ir2] + source_dx * source_sinpsi[ir2]) / temp + source_dy * source_costhe[ir1];
+		dz = -source_sinthe[ir1] * source_cospsi[ir2] * temp + source_dz * source_costhe[ir1];
 	}
 	norm = sqrt(dx*dx + dy*dy + dz*dz);
 	dx /= norm;
@@ -748,47 +878,14 @@ static void Source_time(){
 }
 
 
-static void Source_dir_table(){	/*table for direction cosine in source*/
-	long	n;
-	double	theta, psi;
-
-	for(n=0;n<=TABLEN;n++){
-		theta = asin(source_NA)* n / (double)TABLEN;
-		Source_CosT[n] = cos(theta);
-		Source_SinT[n] = sqrt(1.0 - Source_CosT[n]*Source_CosT[n]);
-
-		psi = 2.0 * PI * n / (double)TABLEN;	/* spin psi 0-2pi. */
-		Source_CosP[n] = cos(psi);
-		if(psi<PI) {
-			Source_SinP[n] = sqrt(1.0 - Source_CosP[n] * Source_CosP[n]);
-		}
-		else {
-			Source_SinP[n] = - sqrt(1.0 - Source_CosP[n] * Source_CosP[n]);
-		}
-	}
-}
-
-
 static void New_len(){
 	long rand;
 
 	rand = (long)(GenRand()*((double)TABLEN-2.0));
-	Len = LenTable[rand] / mut[layer_new];
+	Len = stepsize_table[rand] / mut[layer_new];
 	if(Len == 0){
-		printf("rand = %ld\nLen = %f\n",rand,LenTable[rand]);
+		printf("rand = %ld\nLen = %f\n",rand,stepsize_table[rand]);
 		Len = V0;
-	}
-}
-
-
-static void New_len_table(){
-	/*table for step size*/
-	long n;
-	double r;
-
-	for(n = 1; n < TABLEN; n++){
-		r = (double)n / (double)TABLEN;
-		LenTable[n-1] = -log(r) / SCALE;
 	}
 }
 
@@ -803,14 +900,14 @@ static void New_dir(){
 	ir2 = (long)(GenRand()*((double)TABLEN-1.0));
 
 	if (!strcmp(angfile,"isotropic")){
-		dx = SinT[ir1]*CosP[ir2];
-		dy = SinT[ir1]*SinP[ir2];
-		dz = CosT[ir1];
+		dx = sinthe[ir1]*cospsi[ir2];
+		dy = sinthe[ir1]*sinpsi[ir2];
+		dz = costhe[ir1];
 	}
 	else{
-		dr1 = SinT[ir1]*CosP[ir2];
-		dr2 = SinT[ir1]*SinP[ir2];
-		dr3 = CosT[ir1];
+		dr1 = sinthe[ir1]*cospsi[ir2];
+		dr2 = sinthe[ir1]*sinpsi[ir2];
+		dr3 = costhe[ir1];
 		dt3 = 1-dz*dz;
 		if (dt3>0){
 			dt3 = sqrt(dt3);
@@ -829,107 +926,6 @@ static void New_dir(){
 		dx = -dr1;             /* oposit direction theta=180 deg.*/
 		dy = -dr2;
 		dz = -dr3;
-	}
-}
-
-
-static void New_dir_table(){
-	/* tables for new direction cosins */
-	long   n;
-	double rand, phy, c1, c2, c3, temp, Sin2T;
-
-	for (n=0; n<=TABLEN; n++){
-		rand = (double)n/(double)TABLEN;
-
-		if (!strcmp(angfile, "henyey-greenstein")){
-			c1 = 1.0+g*g;
-			temp = 1.0-g*g;
-			c2 = temp*temp;
-			temp = 1.0+g-2.0*g*rand;
-			c3 = temp*temp;
-			CosT[n] = (c1-c2/c3)/(2.0*g);
-			Sin2T = 1.0-CosT[n]*CosT[n];
-			if (Sin2T<=0){
-				SinT[n] = 0.0;
-			}
-			else{
-				SinT[n] = sqrt(Sin2T);
-			}
-		}
-		else{	/* isotropic */
-			CosT[n] = 1.0-2.0*rand;
-			SinT[n] = sqrt(1.0-CosT[n]*CosT[n]);
-		}
-		phy = n*2.0*(double)PI/(double)TABLEN;
-		CosP[n] = cos(phy);
-		SinP[n] = sin(phy);
-	}
-}
-
-
-static void Ref_table(){
-	/* lookup table of reflection */
-	long i;
-	double t1, t2, t3, t4;
-	double th1, th2;
-
-	if(ref_fg==0){
-		for(i=0; i<=1000; i++){
-			Ref_in[i]=0;
-			Ref_out[i]=0;
-		}
-	}
-
-	else if(ref_fg==1){
-		t1=(ref_ind-1)/(ref_ind+1);
-		Ref_in[1000]=t1*t1;
-		Ref_out[1000]=Ref_in[1000];
-		Ref_in[0]=1;
-		Ref_out[0]=1;
-		for(i=1; i<1000; i++){
-			t1=(double)i/1000;   /* cos(theta) */
-			t2=sqrt(1-t1*t1);    /* sin(theta) */
-			th1=atan2(t2,t1);
-			t2=t2/ref_ind;
-			th2=atan2(t2,sqrt(1-t2*t2));
-			t1=sin(th1-th2);
-			t2=sin(th1+th2);
-			t3=cos(th1-th2);
-			t4=cos(th1+th2);
-
-			/* R = 1/2*[sin(th1-th2)^2/sin(th1+th2)^2 + tan(th1-th2)^2/tan(th1+th2)^2] */
-			Ref_in[i]=0.5*t1*t1/(t2*t2)*(1+t4*t4/(t3*t3));
-			t1=(double)i/1000;
-			t1=sqrt(1-t1*t1)*ref_ind;
-			if(t1>=1){
-				Ref_out[i]=1;
-			}
-			else {
-				th2=atan2(t1,sqrt(1-t1*t1));
-				t1=sin(th1-th2);
-				t2=sin(th1+th2);
-				t3=cos(th1-th2);
-				t4=cos(th1+th2);
-				Ref_out[i]=0.5*t1*t1/(t2*t2)*(1+t4*t4/(t3*t3));
-			}
-		}
-	}
-	else if(ref_fg==2){
-		for(i=0; i<=1000; i++){
-			Ref_in[i]=0;
-			t1=(double)i/1000;
-			t1=(sqrt(1-t1*t1))*ref_ind;
-			if (t1>=1.0){
-				Ref_out[i]=1;
-			}
-			else{
-				Ref_out[i]=0;
-			}
-		}
-	}
-	else {
-		printf("error in ref_fg\n");
-		exit(1);
 	}
 }
 
@@ -975,6 +971,8 @@ static void Restore_voxelpath(){
 	L = Len;
 
 	do{
+        printf("hello\n");
+
 		Check_layer(zoldtemp);
 		layer_old = layer_new;
 
@@ -1324,7 +1322,6 @@ static void Store_data(){
 
 
 static void Fnstop(){
-	char  ch;
 	int i;
 	unsigned long long int sec;
 	int month,day,hour,min;
