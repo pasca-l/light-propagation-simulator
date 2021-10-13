@@ -7,3 +7,6 @@
 *.ssp
 *.com
 *.txt
+*.csv
+
+*/venv
