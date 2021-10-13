@@ -1030,7 +1030,6 @@ void RecordVoxelpath(){ // may be part to change
             temp = temp * mut[layer_old] / mut[layer_new];
         }
     }
-
     step = ltemp;
 }
 
@@ -1158,6 +1157,12 @@ static void Main_mc(){
 
     Fnstop();
     while(phot_in < phot_input && stop_fg == FALSE){
+
+        /* show progress */
+        if(phot_in % (phot_input / 10) == 0){
+            printf("%lld percent done\n", phot_in / (phot_input / 100));
+        }
+
         phot_in ++;
         memset(path, 0, sizeof(path));
         memset(path_y, 0, sizeof(path_y));
@@ -1205,6 +1210,7 @@ static void Main_mc(){
                     dy = -1 * dy;
                     dz = -1 * dz;
                 }
+
                 if(inref_fg == 0){
                     phot_out++;
                     RecordExit();
@@ -1212,9 +1218,6 @@ static void Main_mc(){
                         walk_fg = FALSE;
                     }
                 }
-                xold = xnew;
-                yold = ynew;
-                zold = znew;
             }
             else if(time > time_max){
                 phot_overtime++;
