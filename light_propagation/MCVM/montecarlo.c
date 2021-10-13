@@ -489,34 +489,6 @@ void PreCalculatedTable(){
         }
     }
 
-    /* table for new direction */
-    double c1, c2, c3;
-    for(i = 0; i <= TABLEN; i++){
-        theta = (double) i / TABLEN;
-
-        if(g == 0){
-            costhe[i] = 1 - 2 * theta;
-            sinthe[i] = sqrt(1 - costhe[i] * costhe[i]);
-        }
-        else{
-            c1 = 1 + g * g;
-            c2 = (1 - g * g) * (1 - g * g);
-            c3 = (1 + g - 2 * g * theta) * (1 + g - 2 * g * theta);
-
-            costhe[i] = (c1 - c2 / c3) / (2 * g);
-            if(1 - costhe[i] * costhe[i] <= 0){
-                sinthe[i] = 0;
-            }
-            else{
-                sinthe[i] = sqrt(1 - costhe[i] * costhe[i]);
-            }
-        }
-
-        psi = 2 * PI * i / (double)TABLEN;
-        cospsi[i] = cos(psi);
-        sinpsi[i] = sin(psi);
-    }
-
     /* table for reflection */
     double t1, t2, t3, t4, th1, th2;
     if(ref_fg == 0){
@@ -582,6 +554,34 @@ void PreCalculatedTable(){
     else{
         printf("error: value of ref_fg not valid\n");
         exit(1);
+    }
+
+    /* table for new direction */
+    double c1, c2, c3;
+    for(i = 0; i <= TABLEN; i++){
+        theta = (double) i / TABLEN;
+
+        if(g == 0){
+            costhe[i] = 1 - 2 * theta;
+            sinthe[i] = sqrt(1 - costhe[i] * costhe[i]);
+        }
+        else{
+            c1 = 1 + g * g;
+            c2 = (1 - g * g) * (1 - g * g);
+            c3 = (1 + g - 2 * g * theta) * (1 + g - 2 * g * theta);
+
+            costhe[i] = (c1 - c2 / c3) / (2 * g);
+            if(1 - costhe[i] * costhe[i] <= 0){
+                sinthe[i] = 0;
+            }
+            else{
+                sinthe[i] = sqrt(1 - costhe[i] * costhe[i]);
+            }
+        }
+
+        psi = 2 * PI * i / (double)TABLEN;
+        cospsi[i] = cos(psi);
+        sinpsi[i] = sin(psi);
     }
 }
 
