@@ -1217,18 +1217,14 @@ static void Main_mc(){
                 zold = znew;
             }
             else if(time > time_max){
-                printf("%lf\n", znew);
-                printf("over time %llu\n", phot_overtime);
                 phot_overtime++;
                 walk_fg = FALSE;
             }
             else if(totalpath * SCALE >= maxpath){ /* lost photon (cut off) */
-                printf("over path %llu\n", phot_overpath);
                 phot_overpath++;
                 walk_fg = FALSE;
             }
             else if(scatter_count >= MAX_SCATTER-1){
-                printf("over scat %llu\n", phot_overscat);
                 phot_overscat++;
                 walk_fg = FALSE;
             }

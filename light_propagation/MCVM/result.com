@@ -1,10 +1,10 @@
 <This file is created by 'montecarlo.c'>
-number of input photons 	           10
-number of output photons 	           17
-number of detect photons 	            0
-number of over time photon 	            4
+number of input photons 	          600
+number of output photons 	          983
+number of detect photons 	           13
+number of over time photon 	          318
 number of over path photon 	            0
-number of over scatter photon 	            0
+number of over scatter photon 	            1
 estimate time of 1B photon = 0M, 0D, 0H, 0M, 0S
 
 Layer Num	Thickness	mus	mua
@@ -21,4 +21,3 @@ Source		: (x = 0.0, y = 0.0, z = 0.0)
 Detector NA	: 1.0
 Detector radius	: Min = 0.0	Max = 10.0
 Detector[0]	: (x = 0.0, y = 0.0, z = 0.0)
-stop request

@@ -2,3 +2,8 @@
 */.DS_Store
 
 *.out
+*.data
+*.pd
+*.ssp
+*.com
+*.txt
