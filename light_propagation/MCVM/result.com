@@ -1,8 +1,8 @@
 <This file is created by 'montecarlo.c'>
-number of input photons 	          100
-number of output photons 	            0
+number of input photons 	           10
+number of output photons 	           17
 number of detect photons 	            0
-number of over time photon 	          100
+number of over time photon 	            4
 number of over path photon 	            0
 number of over scatter photon 	            0
 estimate time of 1B photon = 0M, 0D, 0H, 0M, 0S
@@ -19,6 +19,6 @@ Source NA	: 0.0
 Source radius	: Min = 0.0	Max = 30.0
 Source		: (x = 0.0, y = 0.0, z = 0.0)
 Detector NA	: 1.0
-Detector radius	: Min = 0.0	Max = 100.0
+Detector radius	: Min = 0.0	Max = 10.0
 Detector[0]	: (x = 0.0, y = 0.0, z = 0.0)
 stop request

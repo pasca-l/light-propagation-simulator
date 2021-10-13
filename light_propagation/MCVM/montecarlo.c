@@ -70,7 +70,6 @@ static string comfile = "result.com";
 #define TRUE        1
 #define FALSE       0
 
-// extern time_t time(time_t *);
 #define N           25
 #define M           7
 static unsigned long val[N] = {
@@ -184,21 +183,15 @@ static double eweight; /* photon intensity at exit */
 
 static double totalpath;
 static int scatter_count;
-static int source_time;
+static int source_time = 0; /* NEEDS TO BE CHECKED */
 /* ========================================================================= */
-
-/*unsorted variables*/
-/* ========================================================================= */
-static string angfile;
-/* ========================================================================= */
-/* ========================================================================= */
-
 
 /* subfunction declaration ================================================= */
 static void LoadSettings(); /* loads values from settings file */
 static void InitData(); /* initializes variables if file new */
 static void LoadData(); /* loads variables if result partially recorded */
 static void SaveData(); /* saves variables to binary data */
+static void Fnstop();
 static void SetSeed();
 static double GenRand();
 static void PreCalculatedTable(); /* creates table of precalculated values */
@@ -215,8 +208,6 @@ static void Main_mc();
     static void FixPath(); /* fix path length and position */
     static void RecordExit();
     static void CalculateRef();
-
-static void Fnstop();
 /* ========================================================================= */
 
 /* dummy variables ========================================================= */
@@ -240,7 +231,7 @@ int main(void){
 
     time_start = time(NULL);
     Main_mc();
-    // Fnstop();
+    Fnstop();
     SaveData();
 
     exit(0);
@@ -501,16 +492,16 @@ void PreCalculatedTable(){
     /* table for new direction */
     double c1, c2, c3;
     for(i = 0; i <= TABLEN; i++){
-        j = (double) i / TABLEN;
+        theta = (double) i / TABLEN;
 
         if(g == 0){
-            costhe[i] = 1 - 2 * j;
+            costhe[i] = 1 - 2 * theta;
             sinthe[i] = sqrt(1 - costhe[i] * costhe[i]);
         }
         else{
             c1 = 1 + g * g;
             c2 = (1 - g * g) * (1 - g * g);
-            c3 = (1 + g - 2 * g * j) * (1 + g - 2 * g * j);
+            c3 = (1 + g - 2 * g * theta) * (1 + g - 2 * g * theta);
 
             costhe[i] = (c1 - c2 / c3) / (2 * g);
             if(1 - costhe[i] * costhe[i] <= 0){
@@ -662,10 +653,11 @@ void CheckLayer(double z){
 
     int layer_min = 0;
     for(i = 0; i < MAX_LAYER; i++){
-        if(i == MAX_LAYER - 1){
+        if(z >= layer_min && z < (layer_min + thickness[i])){
             layer_new = i;
+            break;
         }
-        else if(z >= layer_min && z < (layer_min + thickness[i])){
+        else if(i == MAX_LAYER - 1){
             layer_new = i;
         }
         else{
@@ -716,14 +708,14 @@ void NewDirection(){
         }
         /* opposite direction */
         else{
-            dx = -dr1;
-            dy = -dr2;
-            dz = -dr3;
+            dx = -1 * dr1;
+            dy = -1 * dr2;
+            dz = -1 * dr3;
         }
     }
 }
 
-void RecordVoxelpath(){ // may be part to alter
+void RecordVoxelpath(){ // may be part to change
     int fg = 0;
     double lx, ly, lz;
     double xtemp, ytemp, ztemp, ltemp;
@@ -1058,7 +1050,7 @@ void FixPath(){
     znew = cross_z;
 }
 
-void RecordExit(){ // may be part to alter
+void RecordExit(){ // may be part to change
     int x, y, z;
     long t, tssp;
     double theta, d1, d2;
@@ -1117,7 +1109,7 @@ void RecordExit(){ // may be part to alter
 }
 
 void CalculateRef(){
-    double n1, n2, n3, theta, ref;
+    double n1, n2, n3, ref;
 
     if(refx_fg == 1 && refy_fg == 0 && refz_fg == 0){
         n1 = -1 * dx / fabs(dx);
@@ -1141,15 +1133,9 @@ void CalculateRef(){
     }
 
     temp = (-1 * dx * n1 + -1 * dy * n2 + -1 * dz * n3);
-    theta = fabs(acos(temp));
-    if(theta > PI / 2 || theta < 0){
-        printf("he\n");
-    }
-
     dx = 2 * temp * n1 + dx;
     dy = 2 * temp * n2 + dy;
     dz = 2 * temp * n3 + dz;
-
     ref = ref_out[(int) (fabs(temp * 1000) + 0.5)];
 
     if(ref == 1 || 1 - (1 - temp * temp) * REF_IND * REF_IND < 0){
@@ -1167,7 +1153,6 @@ static void Main_mc(){
     double pd;
 
     time_max = MT * DT;
-    printf("%ld\n", time_max);
 
     stop_fg = FALSE;
 
@@ -1199,7 +1184,7 @@ static void Main_mc(){
 
         inref_fg = 0;
         walk_fg = TRUE;
-        scatter_count=0;
+        scatter_count = 0;
         while(walk_fg == TRUE){
             scatter_count++;
             RecordVoxelpath();
@@ -1232,6 +1217,7 @@ static void Main_mc(){
                 zold = znew;
             }
             else if(time > time_max){
+                printf("%lf\n", znew);
                 printf("over time %llu\n", phot_overtime);
                 phot_overtime++;
                 walk_fg = FALSE;
@@ -1269,7 +1255,7 @@ static void Main_mc(){
                 NewDirection();
             }
         }
-        if (phot_in % 10 == 0){
+        if (phot_in % 100 == 0){
             Fnstop();
         }
         if (phot_in % 10000000 == 0){
