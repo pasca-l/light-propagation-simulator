@@ -35,6 +35,9 @@ static string comfile = "result.com";
 /* ========================================================================= */
 
 /* global variables to be altered ========================================== */
+#define MAX_DET     1 /* number of detectors */
+#define MAX_LAYER   5 /* number of layers in model*/
+
 #define SCALE       1.0      /* size of pixel*/
 
 #define MAX_X       60       /* data save x (-MAX_X < MAX_X)*/
@@ -44,17 +47,13 @@ static string comfile = "result.com";
 #define PD_MAX_LINE 5
 #define PD_MIN_LINE 1        /*y�������̋��߂�PD�̍��W�͈́i-80�`80�j�i�͈͂�10�ȓ��j*/
 
-#define MAX_DET     1
-#define MAX_LAYER   5
-
 #define MT          400      /* number of division for TPSF */
 #define DT          10
 #define MT_PD       80       /* number of division for TR photon density*/
 #define DT_PD       50
-#define MT_SSP      16       /* number of division for TR spatial */
-    /*sencitivity profile*/
+#define MT_SSP      16       /* number of division for TR SS profile */
 #define DT_SSP      250
-#define INT_CUT     0.0001   /* cutoff intensity for cweight */
+#define INT_CUT     0.0001   /* cutoff intensity for weight */
 #define MAX_SCATTER 100000
 /* ========================================================================= */
 
@@ -66,7 +65,7 @@ static string comfile = "result.com";
 #define RAD_DEG     (180.0 / PI)
 #define COSZERO     (1.0 - 1.0E-12)       /* cosine of about 1e-6 rad */
 
-#define V0          1.77635683940025e-15  /* =2**-49 (min of randnumber) */
+#define MIN_RAND    1.77635683940025e-15  /* =2**-49 (min of randnumber) */
 
 #define TRUE        1
 #define FALSE       0
@@ -74,7 +73,7 @@ static string comfile = "result.com";
 // extern time_t time(time_t *);
 #define N           25
 #define M           7
-static unsigned long x[N] = {
+static unsigned long val[N] = {
     0x95f24dab, 0x0b685215, 0xe76ccae7, 0xaf3ec239, 0x715fad23,
     0x24a590ad, 0x69e4b5ef, 0xbf456141, 0x96bc1b7b, 0xa7bdf825,
     0xc1de75b7, 0x8858a9c9, 0x2da87693, 0xb657f9dd, 0xffdc8a9f,
@@ -92,8 +91,8 @@ static double                 g;           /* mean cosine of phase function */
 static double                 maxpath;     /* max pathlength for cutoff */
 
 static double source_NA;
-static double source_minradius;
-static double source_maxradius;
+static double source_minrad;
+static double source_maxrad;
 static double source_x;
 static double source_y;
 static double source_z;
@@ -102,8 +101,8 @@ static double source_dy;
 static double source_dz;
 
 static double detector_NA;
-static double detector_minradius;
-static double detector_maxradius;
+static double detector_minrad;
+static double detector_maxrad;
 static double detector_x[MAX_DET];
 static double detector_y[MAX_DET];
 static double detector_z[MAX_DET];
@@ -118,8 +117,8 @@ static double mut[MAX_LAYER];
 /* ========================================================================= */
 
 /* variables for recording ================================================= */
-static unsigned long long int phot_start, phot_end;
-static time_t                 time_start, time_end;
+static unsigned long long int phot_start;
+static time_t                 time_start;
 
 static unsigned long long int phot_in;        /* input photons */
 static unsigned long long int phot_out;       /* output photons */
@@ -163,46 +162,33 @@ static double ref_in[1001];
 static double ref_out[1001];
 /* ========================================================================= */
 
-
 /* variables for monte carlo part ========================================== */
-static int	stop_fg;     /* flag to stop calculation */
+static int stop_fg; /* flag to stop calculation */
+static int walk_fg; /* flag to stop random walk */
+
+static double xold, yold, zold;
+static double xnew, ynew, znew;
+static double dx, dy, dz;
+static int vox, voy, voz;
+static double cross_x, cross_y, cross_z; /* coords at border crossing */
+
+static int layer_old, layer_new;
+
+static double step;
+
+static int refx_fg, refy_fg, refz_fg;
+static int inref_fg; /* flag for total internal reflection */
+
+static double weight; /* photon weight */
+static double eweight; /* photon intensity at exit */
+
+static double totalpath;
+static int scatter_count;
+static int source_time;
 /* ========================================================================= */
-
-
 
 /*unsorted variables*/
 /* ========================================================================= */
-#define ref_ind		1.4
-
-static double	allpath;
-static double	NA_Cos[TABLEN];	/* lookup table for direction cosins at source*/
-static double	NA_Sin[TABLEN];	/* lookup table for direction cosins at source*/
-static double	intensity[MAX_DET][MT];
-static double	intensity_for_ssp[MAX_DET][MT_SSP];
-
-static int	inr;		/* flag for total internal reflection */
-static int	fg;			/* flag to stop random walk */
-static int	source_fg;
-static int	refx_fg;
-static int	refy_fg;
-static int	refz_fg;
-
-
-static double 	xold, yold, zold;	/* old x,y,z coordinates */
-static double	xnew, ynew, znew;	/* new x,y,z coordinates */
-static int		vox,voy,voz;
-
-static int		source_time;       /*[20180209�ǈ�]�Ǝˎ��Ԃ̈ʒu*/
-
-static double	cross_x, cross_y, cross_z;
-static int		layer_old,layer_new;
-static int		n_scatter;
-static double	Len;	/* free path lenght */
-static double	Lsub;
-static double	dx, dy, dz;	/* direction cosines */
-static double	sweight;		/* photon intensity for exit (mua=0) */
-static double	cweight;		/* photon intensity for continuation */
-
 static string angfile;
 /* ========================================================================= */
 /* ========================================================================= */
@@ -217,25 +203,25 @@ static void SetSeed();
 static double GenRand();
 static void PreCalculatedTable(); /* creates table of precalculated values */
 
-static void Output_ref();
-static void Output_no_ref();
-static void Source_pos();
-static void Source_dir();
-static void Source_time();
-static void New_len();
-static void New_dir();
-static void Check_layer(double z);
-static void Restore_voxelpath();
-static void Restore_data();
-static void Store_data();
-static void Fnstop();
 static void Main_mc();
+    /* function used within Main_mc() */
+    static void SourcePosition(); /* photon position at source */
+    static void SourceDirection(); /* photon direction at source */
+    static void SourceTime(); /* ?????? */
+    static void CheckLayer(double z); /* layer which photon is in */
+    static void NewStepSize(); /* new step size */
+    static void NewDirection(); /* new scattered direction */
+    static void RecordVoxelpath();
+    static void FixPath(); /* fix path length and position */
+    static void RecordExit();
+    static void CalculateRef();
+
+static void Fnstop();
 /* ========================================================================= */
 
 /* dummy variables ========================================================= */
-long i, j;
+long i, j, r1, r2;
 double temp;
-static char ch = 'n';
 /* ========================================================================= */
 
 
@@ -254,7 +240,7 @@ int main(void){
 
     time_start = time(NULL);
     Main_mc();
-    Fnstop();
+    // Fnstop();
     SaveData();
 
     exit(0);
@@ -267,7 +253,7 @@ void LoadSettings(){
         fprintf(stderr, "%s not found or no content\n", baseconf);
         exit(1);
     }
-    if((fp_model = fopen(baseconf, "r")) == NULL){
+    if((fp_model = fopen(modelconf, "r")) == NULL){
         fprintf(stderr, "%s not found or no content\n", modelconf);
         exit(1);
     }
@@ -281,8 +267,8 @@ void LoadSettings(){
 
     /* values of model.conf */
     fscanf(fp_model, "%lf%*[^\n]%*c", &source_NA);
-    fscanf(fp_model, "%lf%*[^\n]%*c", &source_minradius);
-    fscanf(fp_model, "%lf%*[^\n]%*c", &source_maxradius);
+    fscanf(fp_model, "%lf%*[^\n]%*c", &source_minrad);
+    fscanf(fp_model, "%lf%*[^\n]%*c", &source_maxrad);
     fscanf(fp_model, "%lf%*[^\n]%*c", &source_x);
     fscanf(fp_model, "%lf%*[^\n]%*c", &source_y);
     fscanf(fp_model, "%lf%*[^\n]%*c", &source_z);
@@ -291,8 +277,8 @@ void LoadSettings(){
     fscanf(fp_model, "%lf%*[^\n]%*c", &source_dz);
 
     fscanf(fp_model, "%lf%*[^\n]%*c", &detector_NA);
-    fscanf(fp_model, "%lf%*[^\n]%*c", &detector_minradius);
-    fscanf(fp_model, "%lf%*[^\n]%*c", &detector_maxradius);
+    fscanf(fp_model, "%lf%*[^\n]%*c", &detector_minrad);
+    fscanf(fp_model, "%lf%*[^\n]%*c", &detector_maxrad);
     for(i = 0; i < MAX_DET; i++){
         fscanf(fp_model, "%lf%*[^\n]%*c", &detector_x[i]);
         fscanf(fp_model, "%lf%*[^\n]%*c", &detector_y[i]);
@@ -459,7 +445,7 @@ void SetSeed(){
     time((time_t *) &time_now); /* sec since 00:00:00 1/1/1970 */
 
     for(j = 0; j < N; j++){
-        x[j] -= time_now;
+        val[j] -= time_now;
     }
 
     for(j = 0; j <= 150; j++){ /* exercise the system routine (???) */
@@ -472,15 +458,15 @@ double GenRand(){
 
     if(k == N){
         for(i = 0; i < N - M; i++){
-            x[i] = x[i+M] ^ (x[i] >> 1) ^ mag[x[i] % 2];
+            val[i] = val[i+M] ^ (val[i] >> 1) ^ mag[val[i] % 2];
         }
         for(i = N - M; i < N; i++){
-            x[i] = x[i+M-N] ^ (x[i] >> 1) ^ mag[x[i] % 2];
+            val[i] = val[i+M-N] ^ (val[i] >> 1) ^ mag[val[i] % 2];
         }
         k = 0;
     }
 
-    y = x[k];
+    y = val[k];
     y ^= (y << 7) & 0x2b5b2500;
     y ^= (y << 15) & 0xdb8b0000;
     y &= 0xffffffff;
@@ -500,7 +486,7 @@ void PreCalculatedTable(){
     /* table for direction at source */
     double theta, psi;
     for(i = 0; i <= TABLEN; i++){
-        theta = asin(source_NA) * i / (double)TABLEN;
+        theta = asin(source_NA) * i / TABLEN;
         psi = 2 * PI * i / (double)TABLEN;
 
         source_costhe[i] = cos(theta);
@@ -508,7 +494,7 @@ void PreCalculatedTable(){
         source_sinthe[i] = sqrt(1 - source_costhe[i] * source_costhe[i]);
         source_sinpsi[i] = sqrt(1 - source_cospsi[i] * source_cospsi[i]);
         if(psi > PI){
-            source_sinpsi[i] = -1 * source_sinpsi[i];
+            source_sinpsi[i] *= -1;
         }
     }
 
@@ -609,786 +595,741 @@ void PreCalculatedTable(){
 }
 
 
-static void Main_mc(){
-	long time,time_max;
-	double pd;
-
-	time_max = MT * DT;
-
-	stop_fg = FALSE;
-
-	Fnstop();
-	do{
-		phot_in ++;
-		memset(path, 0, sizeof(path));
-		memset(path_y, 0, sizeof(path_y));
-		memset(path_for_ssp, 0, sizeof(path_for_ssp));
-		allpath=0.0;
-		source_fg = 0;
-
-		/*�� Source�̐ݒ肱������ ��*/
-		xold = source_x;
-		yold = source_y;
-		zold = source_z;
-		Source_pos();	//xold,yold,zold�̌���
-		Source_dir();	//du�̌���
-
-		Source_time(); //�Ǝˎ��Ԃ̌���
-
-		if(zold < 0){
-			printf("error in source\n");
-			printf("new position(x,y,z)=(%f,%f,%f)\n",xold,yold,zold);
-			exit(1);
-		}
-		Check_layer(zold);
-		New_len();	//Len�̌���
-
-		/*�� Source�̐ݒ肱���܂� ��*/
-
-		cweight = 1.0;
-		sweight = 0.0;
-		inr=0;
-		fg = FALSE;
-		n_scatter=0;
-		do{
-			n_scatter += 1;
-			Restore_voxelpath();
-			allpath += Len;
-			xnew = xold+Len*dx;
-			ynew = yold+Len*dy;
-			znew = zold+Len*dz;
-			time = (long)(allpath*ref_ind*SCALE/VC + source_time);
-			if (znew < 0){	/* photon exits */
-				Restore_data();		/* correct coordinates */
-				if (ref_fg == 1){
-					Output_ref();
-				}
-				else{
-					Output_no_ref();
-				}
-				if(inr == 0){
-					phot_out++;
-					Store_data();
-					if (cweight<INT_CUT){
-						fg = TRUE;
-					}
-				}
-
-
-				xold = xnew;
-				yold = ynew;
-				zold = znew;
-			}
-			else if (time > time_max){
-				phot_overtime++;
-				fg = TRUE;
-			}
-			else if (allpath*SCALE>=maxpath){	/* lost photon (cut off) */
-				phot_overpath++;
-				fg = TRUE;
-			}
-			else if (n_scatter >= MAX_SCATTER-1){
-				phot_overscat++;
-				fg = TRUE;
-			}
-			else{
-
-				xold = xnew;
-				yold = ynew;
-				zold = znew;
-
-				if ((voy == (int)source_y) && (vox >= -MAX_X) && (vox < MAX_X + 1) && (voz < MAX_Z)){
-					pd = cweight / mut[layer_new] * (mut[layer_new] - mus[layer_new]);
-					PD[voz][vox + MAX_X] += pd;
-				}
-
-
-			if ((PD_MIN_LINE == voy) && (vox >= -MAX_X) && (vox < MAX_X + 1) && (voz < MAX_Z)){
-					if ((int)(time / DT_PD) < MT_PD){
-						pd = cweight / mut[layer_new] * (mut[layer_new] - mus[layer_new]);
-						TPD[(int)(time / DT_PD)][voz][vox + MAX_X] += pd;
-					}
-				}
-
-
-				cweight = cweight*mus[layer_new]/mut[layer_new];
-
-				New_len();
-				New_dir();
-			}
-		} while (fg != TRUE);
-		if (phot_in % 100 == 0){
-			Fnstop();
-		}
-		if (phot_in % 10000000 == 0){
-			SaveData();
-		}
-        if (phot_in < phot_input){
-            ch = 'y';
-        }
-	} while ((phot_in < phot_input) && (stop_fg!=TRUE));
-
+void SourcePosition(){
+    double radius, theta;
+    radius = source_minrad + ((source_maxrad - source_minrad) * GenRand());
+    theta = 2 * PI * GenRand();
+    if(source_dx == 1 || source_dx == -1){
+        yold = yold + radius * cos(theta);
+        zold = zold + radius * sin(theta);
+    }
+    else if(source_dy == 1 || source_dy == -1){
+        xold = xold + radius * cos(theta);
+        zold = zold + radius * sin(theta);
+    }
+    else if(source_dz == 1 || source_dz == -1){
+        xold = xold + radius * cos(theta);
+        yold = yold + radius * sin(theta);
+    }
 }
 
-static void Output_ref(){
-	/* calculate reflection and refraction in going from tissue to air. */
-	double refl, temp, n_ref1, n_ref2, n_ref3, trans_ratio, theta, duu, ds1, ds2, ds3;
+void SourceDirection(){
+    double norm;
 
-	duu = 0.0;
-	refx_fg = 0;
-	refy_fg = 0;
-	refz_fg = 1;
+    r1 = (long) GenRand() * (TABLEN - 1);
+    r2 = (long) GenRand() * (TABLEN - 1);
 
-	if(refx_fg == 1 && refy_fg == 0 && refz_fg == 0){
-	n_ref1 = -1.0*dx/fabs(dx);
-	n_ref2 = 0.0;
-	n_ref3 = 0.0;
-	//printf("n_ref1 = %lg \n",n_ref1);
-	}
-	else if(refx_fg == 0 && refy_fg == 1 && refz_fg == 0){
-		n_ref1 = 0.0;
-		n_ref2 = -1.0*dy/fabs(dy);
-		n_ref3 = 0.0;
-		//printf("n_ref2 = %lg \n",n_ref2);
-	}
-	else if(refx_fg == 0 && refy_fg ==0 && refz_fg == 1){
-		n_ref1 = 0.0;
-		n_ref2 = 0.0;
-		n_ref3 = -1.0*dz/fabs(dz);
-		//printf("n_ref3 = %lg \n",n_ref3);
+    /* photon input nearly at angle of zero degrees */
+    /* normal launch */
+    if(fabs(source_dz) > COSZERO){
+        dx = source_sinthe[r1] * source_cospsi[r2];
+        dy = source_sinthe[r1] * source_sinpsi[r2];
+        dz = source_costhe[r1];
+        if(source_dz < 0){
+            dz *= -1;
+        }
     }
     else{
-		n_ref1 = -1.0 * dx;
-		n_ref2 = -1.0 * dy;
-		n_ref3 = -1.0 * dz;
-		//printf("else\n");
-	}
+        temp = sqrt(1 - source_dz * source_dz);
+        dx = (source_sinthe[r1] * (source_dx * source_dz * source_cospsi[r2] -
+             source_dy * source_sinpsi[r2]) / temp +
+             source_dx * source_costhe[r1]);
+        dy = (source_sinthe[r1] * (source_dy * source_dz * source_cospsi[r2] +
+             source_dx * source_sinpsi[r2]) / temp +
+             source_dy * source_costhe[r1]);
+        dz = (-1 * source_sinthe[r1] * source_cospsi[r2] * temp +
+             source_dz * source_costhe[r1]);
+    }
 
-	ds1 = -1.0 * dx;
-	ds2 = -1.0 * dy;
-	ds3 = -1.0 * dz;
-
-	theta = fabs(acos(ds1*n_ref1 + ds2*n_ref2 + ds3*n_ref3));
-
-	if(theta>(PI/2) || theta<0){
-		printf("dx = %g,dy = %lg, dz = %lg\n",dx,dy,dz);
-		printf("du = %lg\n",sqrt(dx*dx + dy*dy + dz*dz));
-		printf("theta=%lg\n",theta);
-		printf("Len=%lg\n\n",Len);
-	}
-
-	duu=(ds1*n_ref1 + ds2*n_ref2 + ds3*n_ref3);
-
-	dx = 2.0 * (ds1 * n_ref1 + ds2 * n_ref2 + ds3 * n_ref3) * n_ref1-ds1;
-	dy = 2.0 * (ds1 * n_ref1 + ds2 * n_ref2 + ds3 * n_ref3) * n_ref2-ds2;
-	dz = 2.0 * (ds1 * n_ref1 + ds2 * n_ref2 + ds3 * n_ref3) * n_ref3-ds3;
-
-	refl = ref_out[(long)((fabs(duu * 1000)) + 0.5)];    /* calculate reflection */
-	trans_ratio = 1.0 - refl;
-
-	if (refl == 1)
-	inr = 1;                              /* total internal reflection */
-	else{
-		temp = 1-(1-duu*duu) * ref_ind*ref_ind;
-		if (temp < 0.0){                         /* can happen due to foundoff */
-			inr = 1;
-		}
-		else{
-			sweight = cweight * (1 - refl);
-			cweight = cweight * refl;
-			inr =0;
-		}
-	}
+    norm = sqrt(dx * dx + dy * dy + dz * dz);
+    dx /= norm;
+    dy /= norm;
+    dz /= norm;
 }
 
-
-static void Output_no_ref(){
-	/* calculate direction cosines relevant to tangent plane */
-	sweight = cweight;
-	cweight = 0.0;
-	dx = -dx; //for acos in Store_data()
-	dy = -dy;
-	dz = -dz;
+void SourceTime(){
+    temp = GenRand();
+    if(0 <= temp && temp <= 1){
+        source_time = 0;
+    }
 }
 
+void CheckLayer(double z){
+    if(z < 0){
+        printf("error: invalid z coordinate, (z = %lf)\n", z);
+        exit(0);
+    }
 
-static void Source_pos(){
-	double rand1,rand2,radius,theta;
-
-	rand1 = GenRand();
-	radius = source_minradius + ((source_maxradius - source_minradius) * rand1);
-	rand2 = GenRand();
-	theta = 2 * PI * rand2;
-	if(source_dx == 1 || source_dx == -1){
-		yold = yold + radius * cos(theta);
-		zold = zold + radius * sin(theta);
-	}
-	else if(source_dy == 1 || source_dy == -1){
-		xold = xold - radius * cos(theta);
-		zold = zold + radius * sin(theta);
-	}
-	else if(source_dz == 1 || source_dz == -1){
-		xold = xold + radius * cos(theta);
-		yold = yold + radius * sin(theta);
-	}
+    int layer_min = 0;
+    for(i = 0; i < MAX_LAYER; i++){
+        if(i == MAX_LAYER - 1){
+            layer_new = i;
+        }
+        else if(z >= layer_min && z < (layer_min + thickness[i])){
+            layer_new = i;
+        }
+        else{
+            layer_min += thickness[i];
+        }
+    }
 }
 
+void NewStepSize(){
+    r1 = (long) (GenRand() * ((double) TABLEN - 2));
 
-static void Source_dir(){
-	/* calculate  direction vector at source (isotropic source)*/
-	long ir1, ir2;
-	double norm;
-
-	ir1 = (long)(GenRand()*((double)TABLEN-1.0));
-	ir2 = (long)(GenRand()*((double)TABLEN-1.0));
-
-	if(fabs(source_dz) > COSZERO) {   /* normal launch */
-		dx = source_sinthe[ir1]*source_cospsi[ir2];
-		dy = source_sinthe[ir1]*source_sinpsi[ir2];
-		if(source_dz >= 0){
-			dz = source_costhe[ir1];
-		}
-		else {
-			dz = - source_costhe[ir1];
-		}
-	}
-	else {
-		double temp = sqrt(1.0 - source_dz*source_dz);
-		dx = source_sinthe[ir1] * (source_dx * source_dz * source_cospsi[ir2] - source_dy * source_sinpsi[ir2]) / temp + source_dx * source_costhe[ir1];
-		dy = source_sinthe[ir1] * (source_dy * source_dz * source_cospsi[ir2] + source_dx * source_sinpsi[ir2]) / temp + source_dy * source_costhe[ir1];
-		dz = -source_sinthe[ir1] * source_cospsi[ir2] * temp + source_dz * source_costhe[ir1];
-	}
-	norm = sqrt(dx*dx + dy*dy + dz*dz);
-	dx /= norm;
-	dy /= norm;
-	dz /= norm;
+    step = stepsize_table[r1] / mut[layer_new];
+    if(step == 0){
+        printf("step size set to V0:\nrand = %ld\nstep = %lf\n",
+                r1, stepsize_table[r1]);
+        step = MIN_RAND;
+    }
 }
 
+void NewDirection(){
+    double dr1, dr2, dr3;
 
-/*[20180209�ǈ�]�Ǝˎ��Ԃ̈ʒu�̌���*/
-static void Source_time(){
-	double rand_time;
+    r1 = (long) (GenRand() * ((double) TABLEN - 1));
+    r2 = (long) (GenRand() * ((double) TABLEN - 1));
 
-	rand_time = GenRand();
-	if	(	0.00000000000000 	<=	rand_time	&&		rand_time	<=	1.00000000 	)	{	source_time	=	0	;	}
+    if(g == 0){
+        dx = sinthe[r1] * cospsi[r2];
+        dy = sinthe[r1] * sinpsi[r2];
+        dz = costhe[r1];
+    }
+    else{
+        dr1 = sinthe[r1] * cospsi[r2];
+        dr2 = sinthe[r1] * sinpsi[r2];
+        dr3 = costhe[r1];
 
-
-
-
+        temp = 1 - dz * dz;
+        if(temp > 0){
+            temp = sqrt(temp);
+            dx = (dx * dz * dr1 - dy * dr2) / temp + dx * dr3;
+            dy = (dy * dz * dr1 + dx * dr2) / temp + dy * dr3;
+            dz = dz * dr3 - temp * dr1;
+        }
+        /* same direction */
+        else if(dz > 0){
+            dx = dr1;
+            dy = dr2;
+            dz = dr3;
+        }
+        /* opposite direction */
+        else{
+            dx = -dr1;
+            dy = -dr2;
+            dz = -dr3;
+        }
+    }
 }
 
+void RecordVoxelpath(){ // may be part to alter
+    int fg = 0;
+    double lx, ly, lz;
+    double xtemp, ytemp, ztemp, ltemp;
 
-static void New_len(){
-	long rand;
+    temp = step;
+    xtemp = xold;
+    ytemp = yold;
+    ztemp = zold;
+    ltemp = 0;
 
-	rand = (long)(GenRand()*((double)TABLEN-2.0));
-	Len = stepsize_table[rand] / mut[layer_new];
-	if(Len == 0){
-		printf("rand = %ld\nLen = %f\n",rand,stepsize_table[rand]);
-		Len = V0;
-	}
+    /* voxel position */
+    if(xtemp < 0){
+        vox = (int) xtemp - 1;
+    }
+    else{
+        vox = (int) xtemp;
+    }
+    if(ytemp < 0){
+        voy = (int) ytemp - 1;
+    }
+    else{
+        voy = (int) ytemp;
+    }
+    voz = (int) ztemp;
+
+    while(fg == 0){
+        CheckLayer(ztemp);
+        layer_old = layer_new;
+
+        refx_fg = 0;
+        refy_fg = 0;
+        refz_fg = 0;
+
+        if(dx > 0){
+            lx = (vox + 1 - xtemp) / dx;
+        }
+        else if(dx < 0){
+            lx = (vox - xtemp) / dx;
+        }
+        else if(dx == 0){
+            lx = (double) 1 / 0;
+        }
+
+        if(dy > 0){
+            ly = (voy + 1 - ytemp) / dy;
+        }
+        else if(dy < 0){
+            ly = (voy - ytemp) / dy;
+        }
+        else if(dy == 0){
+            ly = (double) 1 / 0;
+        }
+
+        if(dz > 0){
+            lz = (voz + 1 - ztemp) / dz;
+        }
+        else if(dz < 0){
+            lz = (voz - ztemp) / dz;
+        }
+        else if(dz == 0){
+            lz = (double) 1 / 0;
+        }
+
+        /* possible combinations of photon moving in voxel */
+        if(lx < ly && lx < lz && lx <= temp){
+            ltemp += lx;
+            path[layer_old] += lx;
+            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+               0 <= voz && voz < MAX_Z &&
+               -1 * MAX_X <= vox && vox < MAX_X + 1){
+                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += lx;
+
+                   if(voy == (int) source_y){
+                       path_y[layer_old] += lx;
+                   }
+            }
+
+            temp = temp - lx;
+            refx_fg = 1;
+            xtemp = xtemp + lx * dx;
+            ytemp = ytemp + lx * dy;
+            ztemp = ztemp + lx * dz;
+            if(dx > 0){
+                vox += 1;
+            }
+            else if(dx < 0){
+                vox -= 1;
+            }
+        }
+        else if(ly < lx && ly < lz && ly <= temp){
+            ltemp += ly;
+            path[layer_old] += ly;
+            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+               0 <= voz && voz < MAX_Z &&
+               -1 * MAX_X <= vox && vox < MAX_X + 1){
+                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += ly;
+
+                   if(voy == (int) source_y){
+                       path_y[layer_old] += ly;
+                   }
+            }
+
+            temp = temp - ly;
+            refy_fg = 1;
+            xtemp = xtemp + ly * dx;
+            ytemp = ytemp + ly * dy;
+            ztemp = ztemp + ly * dz;
+            if(dy > 0){
+                voy += 1;
+            }
+            else if(dy < 0){
+                voy -= 1;
+            }
+        }
+        else if(lz < lx && lz < ly && lz <= temp){
+            ltemp += lz;
+            path[layer_old] += lz;
+            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+               0 <= voz && voz < MAX_Z &&
+               -1 * MAX_X <= vox && vox < MAX_X + 1){
+                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += lz;
+
+                   if(voy == (int) source_y){
+                       path_y[layer_old] += lz;
+                   }
+            }
+
+            temp = temp - lz;
+            refz_fg = 1;
+            xtemp = xtemp + lz * dx;
+            ytemp = ytemp + lz * dy;
+            ztemp = ztemp + lz * dz;
+            if(dz > 0){
+                voz += 1;
+            }
+            else if(dz < 0){
+                voz -= 1;
+            }
+        }
+        else if(lx == ly && lx < lz && lx <= temp){
+            ltemp += lx;
+            path[layer_old] += lx;
+            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+               0 <= voz && voz < MAX_Z &&
+               -1 * MAX_X <= vox && vox < MAX_X + 1){
+                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += lx;
+
+                   if(voy == (int) source_y){
+                       path_y[layer_old] += lx;
+                   }
+            }
+
+            temp = temp - lx;
+            refx_fg = 1;
+            refy_fg = 1;
+            xtemp = xtemp + lx * dx;
+            ytemp = ytemp + lx * dy;
+            ztemp = ztemp + lx * dz;
+            if(dx > 0){
+                vox += 1;
+            }
+            else if(dx < 0){
+                vox -= 1;
+            }
+            if(dy > 0){
+                voy += 1;
+            }
+            else if(dy < 0){
+                voy -= 1;
+            }
+        }
+        else if(lx < ly && lx == lz && lx <= temp){
+            ltemp += lx;
+            path[layer_old] += lx;
+            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+               0 <= voz && voz < MAX_Z &&
+               -1 * MAX_X <= vox && vox < MAX_X + 1){
+                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += lx;
+
+                   if(voy == (int) source_y){
+                       path_y[layer_old] += lx;
+                   }
+            }
+
+            temp = temp - lx;
+            refx_fg = 1;
+            refz_fg = 1;
+            xtemp = xtemp + lx * dx;
+            ytemp = ytemp + lx * dy;
+            ztemp = ztemp + lx * dz;
+            if(dx > 0){
+                vox += 1;
+            }
+            else if(dx < 0){
+                vox -= 1;
+            }
+            if(dz > 0){
+                voz += 1;
+            }
+            else if(dz < 0){
+                voz -= 1;
+            }
+        }
+        else if(ly < lx && ly == lz && ly <= temp){
+            ltemp += ly;
+            path[layer_old] += ly;
+            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+               0 <= voz && voz < MAX_Z &&
+               -1 * MAX_X <= vox && vox < MAX_X + 1){
+                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += ly;
+
+                   if(voy == (int) source_y){
+                       path_y[layer_old] += ly;
+                   }
+            }
+
+            temp = temp - ly;
+            refy_fg = 1;
+            refz_fg = 1;
+            xtemp = xtemp + ly * dx;
+            ytemp = ytemp + ly * dy;
+            ztemp = ztemp + ly * dz;
+            if(dy > 0){
+                voy += 1;
+            }
+            else if(dy < 0){
+                voy -= 1;
+            }
+            if(dz > 0){
+                voz += 1;
+            }
+            else if(dz < 0){
+                voz -= 1;
+            }
+        }
+        else if(lx == ly && ly == lz && lx == lz && lx <= temp){
+            ltemp += lx;
+            path[layer_old] += lx;
+            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+               0 <= voz && voz < MAX_Z &&
+               -1 * MAX_X <= vox && vox < MAX_X + 1){
+                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += lx;
+
+                   if(voy == (int) source_y){
+                       path_y[layer_old] += lx;
+                   }
+            }
+
+            temp = temp - lx;
+            refx_fg = 1;
+            refy_fg = 1;
+            refz_fg = 1;
+            xtemp = xtemp + lx * dx;
+            ytemp = ytemp + lx * dy;
+            ztemp = ztemp + lx * dz;
+            if(dx > 0){
+                vox += 1;
+            }
+            else if(dx < 0){
+                vox -= 1;
+            }
+            if(dy > 0){
+                voy += 1;
+            }
+            else if(dy < 0){
+                voy -= 1;
+            }
+            if(dz > 0){
+                voz += 1;
+            }
+            else if(dz < 0){
+                voz -= 1;
+            }
+        }
+        else if(temp < lx && temp < ly && temp < lz){
+            ltemp += temp;
+            path[layer_old] += temp;
+            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+               0 <= voz && voz < MAX_Z &&
+               -1 * MAX_X <= vox && vox < MAX_X + 1){
+                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += temp;
+
+                   if(voy == (int) source_y){
+                       path_y[layer_old] += temp;
+                   }
+            }
+
+            temp = 0;
+            fg = 1;
+        }
+        else{
+            printf("error: unexpected condition given for path calculation\n");
+            printf("(lx,ly,lz,temp) = (%lf,%lf,%lf,%lf)\n", lx, ly, lz, temp);
+            exit(1);
+        }
+
+        if(voz < 0){
+            ltemp += temp;
+            fg = 1;
+            ztemp = 0;
+            cross_x = xtemp;
+            cross_y = ytemp;
+            cross_z = ztemp;
+        }
+        if(ztemp < 0){
+            printf("error: invalid z coord\nz = %lf\nvoz = %d\n", ztemp, voz);
+            exit(1);
+        }
+
+        CheckLayer(ztemp);
+        if(layer_new != layer_old){
+            temp = temp * mut[layer_old] / mut[layer_new];
+        }
+    }
+
+    step = ltemp;
 }
 
+void FixPath(){
+    temp = sqrt((xnew - cross_x) * (xnew - cross_x) +
+                (ynew - cross_y) * (ynew - cross_y) +
+                (znew - cross_z) * (znew - cross_z));
+    totalpath -= temp;
+    step = temp;
 
-static void New_dir(){
-	/* calculate new direction vector (isotropic scattering)*/
-	double dr1, dr2, dr3;     /* relative new direction cosines */
-	double dv1, dt3;
-	long ir1, ir2;
+    if(step == 0){
+        step = -1 * log((double) MIN_RAND) / mut[0] / SCALE;
+    }
 
-	ir1 = (long)(GenRand()*((double)TABLEN-1.0));
-	ir2 = (long)(GenRand()*((double)TABLEN-1.0));
-
-	if (!strcmp(angfile,"isotropic")){
-		dx = sinthe[ir1]*cospsi[ir2];
-		dy = sinthe[ir1]*sinpsi[ir2];
-		dz = costhe[ir1];
-	}
-	else{
-		dr1 = sinthe[ir1]*cospsi[ir2];
-		dr2 = sinthe[ir1]*sinpsi[ir2];
-		dr3 = costhe[ir1];
-		dt3 = 1-dz*dz;
-		if (dt3>0){
-			dt3 = sqrt(dt3);
-			dv1 = (dx*dz*dr1-dy*dr2)/dt3+dx*dr3;
-			dy = (dy*dz*dr1+dx*dr2)/dt3+dy*dr3;
-			dz = dz*dr3-dt3*dr1;
-			dx = dv1;
-			return;
-		}
-		if (dz>0){            /* same direction, theta=0 */
-			dx = dr1;
-			dy = dr2;
-			dz = dr3;
-			return;
-		}
-		dx = -dr1;             /* oposit direction theta=180 deg.*/
-		dy = -dr2;
-		dz = -dr3;
-	}
+    xnew = cross_x;
+    ynew = cross_y;
+    znew = cross_z;
 }
 
+void RecordExit(){ // may be part to alter
+    int x, y, z;
+    long t, tssp;
+    double theta, d1, d2;
 
-static void Check_layer(double z){
-	int layer_num,layer_min;
-	layer_min = 0;
-	if(z < 0){
-		printf("ERROR:z = %f\n", z);
-		exit(1);
-	}
-	for(layer_num = 0; layer_num < MAX_LAYER; layer_num++){
-		if(z >= layer_min && z < (layer_min + thickness[layer_num])){
-			layer_new = layer_num;
-			break;
-		}
-		else if(layer_num == MAX_LAYER - 1){
-			layer_new = layer_num;
-		}
-		else{
-			layer_min += thickness[layer_num];
-		}
-	}
+    t = (long) fabs((totalpath * REF_IND * SCALE / VC + source_time) / DT);
+    tssp = (long) fabs((totalpath * REF_IND * SCALE / VC + source_time) / DT_SSP);
+
+    for(i = 0; i < MAX_DET; i++){
+        theta = acos(detector_dx[i] * dx +
+                     detector_dy[i] * dy +
+                     detector_dz[i] * dz);
+
+        if(detector_dz[i] == 1 || detector_dz[i] == -1){
+            d1 = (detector_x[i] - xnew) * (detector_x[i] - xnew);
+            d2 = (detector_y[i] - ynew) * (detector_y[i] - ynew);
+        }
+
+        if(sqrt(d1 + d2) >= (double) detector_minrad / SCALE &&
+           sqrt(d1 + d2) <= (double) detector_maxrad / SCALE &&
+           theta <= asin(detector_NA)){
+               phot_detected++;
+
+               for(j = 0; j < MAX_LAYER; j++){
+                   ppath[i][j] += eweight * path[j] * SCALE;
+                   if(t >= 0 && t < MT){
+                       tppath[i][t][j] += eweight * path[j] * SCALE;
+                       tppath_y[i][t][j] += eweight * path_y[j] * SCALE;
+                   }
+               }
+               for(z = 0; z < MAX_Z; z++){
+                   for(x = 0; x < 2 * MAX_X; x++){
+                       for(y = 0; y <= 2 * MAX_Y; y++){
+                           temp = eweight * path_for_ssp[z][x][y] * SCALE;
+                           SSP[i][z][x][y] += temp;
+                       }
+                   }
+               }
+
+               if(tssp >= 0 && tssp < MT_SSP){
+                   intensity_for_ssp[i][tssp] += eweight;
+                   for(z = 0; z < MAX_Z; z++){
+                       for(x = 0; x < 2 * MAX_X; x++){
+                           for(y = 0; y <= 2 * MAX_Y; y++){
+                               temp = eweight * path_for_ssp[z][x][y] * SCALE;
+                               TSSP[i][tssp][z][x][y] += temp;
+                           }
+                       }
+                   }
+               }
+
+               if(t >= 0 && t < MT){
+                   intensity[i][t] += eweight;
+               }
+        }
+    }
 }
 
+void CalculateRef(){
+    double n1, n2, n3, theta, ref;
 
-static void Restore_voxelpath(){
-	int n,restore_fg;
-	double xoldtemp, yoldtemp, zoldtemp;
-	double L,L_temp,Lx,Ly,Lz;
+    if(refx_fg == 1 && refy_fg == 0 && refz_fg == 0){
+        n1 = -1 * dx / fabs(dx);
+        n2 = 0;
+        n3 = 0;
+    }
+    else if(refx_fg == 0 && refy_fg == 1 && refz_fg == 0){
+        n1 = 0;
+        n2 = -1 * dy / fabs(dy);
+        n3 = 0;
+    }
+    else if(refx_fg == 0 && refy_fg == 0 && refz_fg == 1){
+        n1 = 0;
+        n2 = 0;
+        n3 = -1 * dy / fabs(dz);
+    }
+    else{
+        n1 = -1 * dx;
+        n2 = -1 * dy;
+        n3 = -1 * dz;
+    }
 
-	restore_fg = 0;
-	L_temp = 0.0;
-	xoldtemp = xold;
-	yoldtemp = yold;
-	zoldtemp = zold;
-	if(xoldtemp < 0){	vox = (int)(xoldtemp) - 1;}
-	else{				vox = (int)(xoldtemp);}
-	if(yoldtemp < 0){	voy = (int)(yoldtemp) - 1;}
-	else{				voy = (int)(yoldtemp);}
-	voz = (int)(zoldtemp);
-	n = 0;
-	L = Len;
+    temp = (-1 * dx * n1 + -1 * dy * n2 + -1 * dz * n3);
+    theta = fabs(acos(temp));
+    if(theta > PI / 2 || theta < 0){
+        printf("he\n");
+    }
 
-	do{
-        printf("hello\n");
+    dx = 2 * temp * n1 + dx;
+    dy = 2 * temp * n2 + dy;
+    dz = 2 * temp * n3 + dz;
 
-		Check_layer(zoldtemp);
-		layer_old = layer_new;
+    ref = ref_out[(int) (fabs(temp * 1000) + 0.5)];
 
-		refx_fg = 0;
-		refy_fg = 0;
-		refz_fg = 0;
-
-		if(dx > 0){
-			Lx = ((double)vox+1.0-xoldtemp)/dx;
-		}
-		else if (dx < 0) {
-			Lx = ((double)vox-xoldtemp)/dx;
-		}
-		else if(dx==0) {
-			Lx=1.0/0.0;
-		}
-
-		if(dy > 0){
-			Ly= ((double)voy+1.0-yoldtemp)/dy;
-		}
-	    else if(dy < 0){
-			Ly= ((double)voy-yoldtemp)/dy;
-		}
-		else if(dy==0){
-			Ly=1.0/0.0;
-		}
-
-		if(dz > 0){
-			Lz= ((double)voz+1.0-zoldtemp)/dz;
-		}
-		else if (dz < 0) {
-			Lz= ((double)voz-zoldtemp)/dz;
-		}
-		else if(dz == 0) {
-			Lz=1.0/0.0;
-		}
-
-		if ((Lx < Ly) && (Lx < Lz) && (Lx <= L)){
-			L_temp += Lx;
-			path[layer_old] += Lx;
-			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Lx;
-
-			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-
-				path_y[layer_old] += Lx;
-			}
-				}
-
-
-			L = L - Lx;
-			refx_fg = 1;
-			xoldtemp = xoldtemp+Lx*dx;
-			yoldtemp = yoldtemp+Lx*dy;
-			zoldtemp = zoldtemp+Lx*dz;
-			if (dx>0){
-			  vox +=1;
-			}
-			else if(dx<0){
-				vox -=1;
-			}
-		}
-		else if((Ly < Lx) && (Ly < Lz) && (Ly <= L)){
-			L_temp += Ly;
-			path[layer_old] += Ly;
-			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Ly;
-
-			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-				path_y[layer_old] += Ly;
-			}
-			}
-			L = L - Ly;
-			refy_fg = 1;
-			xoldtemp = xoldtemp+Ly*dx;
-			yoldtemp = yoldtemp+Ly*dy;
-			zoldtemp = zoldtemp+Ly*dz;
-			if (dy > 0){
-				voy +=1;
-			}
-			else if (dy < 0){
-				voy -=1;
-			}
-		}
-		else if((Lz < Lx) && (Lz < Ly) && (Lz <= L)){
-			L_temp += Lz;
-			path[layer_old] += Lz;
-			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Lz;
-
-			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-				path_y[layer_old] += Lz;
-			}
-			}
-			L = L - Lz;
-			refz_fg = 1;
-			xoldtemp = xoldtemp+Lz*dx;
-			yoldtemp = yoldtemp+Lz*dy;
-			zoldtemp = zoldtemp+Lz*dz;
-			if (dz>0){
-			    voz +=1;
-			}
-			else if(dz < 0){
-			    voz -=1;
-			}
-		}
-		else if((Lx == Ly) && (Lx < Lz) && (Lx <= L)){
-			L_temp += Lx;
-			path[layer_old] += Lx;
-			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Lx;
-
-			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-
-				path_y[layer_old] += Lx;
-			}
-			}
-			L = L - Lx;
-			refx_fg = 1;
-			refy_fg = 1;
-			xoldtemp = xoldtemp+Lx*dx;
-			yoldtemp = yoldtemp+Lx*dy;
-			zoldtemp = zoldtemp+Lx*dz;
-			if (dx>0){
-				vox +=1;
-			}
-			else if(dx<0){
-				vox -=1;
-			}
-			if (dy>0){
-				voy +=1;
-			}
-			else if(dy<0){
-				voy -=1;
-			}
-		}
-		else if((Lx == Lz) && (Lx < Ly) && (Lx <= L)){
-			L_temp += Lx;
-			path[layer_old] += Lx;
-			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Lx;
-
-			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-				path_y[layer_old] += Lx;
-			}
-			}
-			L = L - Lx;
-			refx_fg = 1;
-			refz_fg = 1;
-			xoldtemp = xoldtemp+Lx*dx;
-			yoldtemp = yoldtemp+Lx*dy;
-			zoldtemp = zoldtemp+Lx*dz;
-			if (dx>0){
-				vox +=1;
-			}
-			else if(dx<0){
-				vox -=1;
-			}
-			if (dz>0){
-				voz +=1;
-			}
-			else if(dz<0){
-				voz -=1;
-			}
-		}
-		else if((Ly == Lz) && (Ly < Lx) && (Ly <= L)){
-			L_temp += Ly;
-			path[layer_old] += Ly;
-			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Ly;
-
-			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-
-				path_y[layer_old] += Ly;
-			}
-			}
-			L = L - Ly;
-			refy_fg = 1;
-			refz_fg = 1;
-			xoldtemp = xoldtemp+Ly*dx;
-			yoldtemp = yoldtemp+Ly*dy;
-			zoldtemp = zoldtemp+Ly*dz;
-			if (dy>0){
-				voy +=1;
-			}
-			else if(dy<0){
-				voy -=1;
-			}
-			if (dz>0){
-				voz +=1;
-			}
-			else if(dz<0){
-				voz -=1;
-			}
-		}
-		else if((Lx == Ly) && (Ly == Lz) && (Lz == Lx) && (Lx <= L)){
-			L_temp += Lx;
-			path[layer_old] += Lx;
-			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += Lx;
-
-			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-
-				path_y[layer_old] += Lx;
-			}
-			}
-			L = L - Lx;
-			refx_fg = 1;
-			refy_fg = 1;
-			refz_fg = 1;
-			xoldtemp = xoldtemp+Lx*dx;
-			yoldtemp = yoldtemp+Lx*dy;
-			zoldtemp = zoldtemp+Lx*dz;
-
-			if (dx>0){
-				vox +=1;
-			}
-			else if(dx<0){
-				vox -=1;
-			}
-			if (dy>0){
-				voy +=1;
-			}
-			else if(dy < 0){
-				voy -=1;
-			}
-			if (dz>0){
-				voz +=1;
-			}
-			else if(dz < 0){
-				voz -=1;
-			}
-		}
-		else if((L < Lx) && (L < Ly) && (L < Lz)){
-			L_temp += L;
-			path[layer_old] += L;
-			if((PD_MIN_LINE <= voy) && (voy <= PD_MAX_LINE) && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-				path_for_ssp[voz][vox+MAX_X][voy - PD_MIN_LINE] += L;
-
-			if(voy == (int)source_y && voz >= 0 && voz < MAX_Z && vox >= -MAX_X && vox < MAX_X+1){
-
-				path_y[layer_old] += L;
-			}
-			}
-			L=0.0;
-			restore_fg = 1;
-		}
-		else {
-			printf("ERROR\n");
-		}
-
-		if(voz < 0){
-			L_temp +=L;
-			restore_fg = 1;
-			zoldtemp = 0;
-			cross_x = xoldtemp;
-			cross_y = yoldtemp;
-			cross_z = zoldtemp;
-		}
-		if(zoldtemp < 0){
-			printf("Restore_ERROR\nzoldtemp = %f,voz = %d\n",zoldtemp,voz);
-			exit(1);
-		}
-		Check_layer(zoldtemp);
-		if(layer_new != layer_old){
-			L = L*mut[layer_old]/mut[layer_new];
-		}
-	}while(restore_fg == 0);
-
-	Len = L_temp;
+    if(ref == 1 || 1 - (1 - temp * temp) * REF_IND * REF_IND < 0){
+        inref_fg = 1;
+    }
+    else{
+        eweight = weight * (1 - ref);
+        weight = weight * ref;
+        inref_fg = 0;
+    }
 }
 
+static void Main_mc(){
+    long time, time_max;
+    double pd;
 
-static void Restore_data(){
-	/* correct total pathlength and find rigth X- and Y coordinates */
-	Lsub = sqrt((xnew - cross_x)*(xnew -cross_x) + (ynew - cross_y)*(ynew -cross_y) + (znew - cross_z)*(znew - cross_z));
-	allpath -= Lsub;
-	Len = Lsub;
+    time_max = MT * DT;
+    printf("%ld\n", time_max);
 
-	if (Len == 0){
-		Len = (double)V0;
-		Len = -(log(Len)/mut[0])/SCALE;
-	}
+    stop_fg = FALSE;
 
-	xnew= cross_x;
-	ynew= cross_y;
-	znew= cross_z;
+    Fnstop();
+    while(phot_in < phot_input && stop_fg == FALSE){
+        phot_in ++;
+        memset(path, 0, sizeof(path));
+        memset(path_y, 0, sizeof(path_y));
+        memset(path_for_ssp, 0, sizeof(path_for_ssp));
+        totalpath = 0;
+
+        xold = source_x;
+        yold = source_y;
+        zold = source_z;
+        SourcePosition();
+        SourceDirection();
+
+        SourceTime();
+
+        if(zold < 0){
+            printf("error: invalid source position\n");
+            exit(1);
+        }
+        CheckLayer(zold);
+        NewStepSize();
+
+        weight = 1;
+        eweight = 0;
+
+        inref_fg = 0;
+        walk_fg = TRUE;
+        scatter_count=0;
+        while(walk_fg == TRUE){
+            scatter_count++;
+            RecordVoxelpath();
+            totalpath += step;
+            xnew = xold + step * dx;
+            ynew = yold + step * dy;
+            znew = zold + step * dz;
+            time = (long)(totalpath*REF_IND*SCALE/VC + source_time);
+            if(znew < 0){    /* photon exits */
+                FixPath();
+                if (ref_fg == 1){
+                    CalculateRef();
+                }
+                else{
+                    eweight = weight;
+                    weight = 0;
+                    dx = -1 * dx;
+                    dy = -1 * dy;
+                    dz = -1 * dz;
+                }
+                if(inref_fg == 0){
+                    phot_out++;
+                    RecordExit();
+                    if (weight < INT_CUT){
+                        walk_fg = FALSE;
+                    }
+                }
+                xold = xnew;
+                yold = ynew;
+                zold = znew;
+            }
+            else if(time > time_max){
+                printf("over time %llu\n", phot_overtime);
+                phot_overtime++;
+                walk_fg = FALSE;
+            }
+            else if(totalpath * SCALE >= maxpath){ /* lost photon (cut off) */
+                printf("over path %llu\n", phot_overpath);
+                phot_overpath++;
+                walk_fg = FALSE;
+            }
+            else if(scatter_count >= MAX_SCATTER-1){
+                printf("over scat %llu\n", phot_overscat);
+                phot_overscat++;
+                walk_fg = FALSE;
+            }
+            else{
+                xold = xnew;
+                yold = ynew;
+                zold = znew;
+
+                if ((voy == (int)source_y) && (vox >= -MAX_X) && (vox < MAX_X + 1) && (voz < MAX_Z)){
+                    pd = weight / mut[layer_new] * (mut[layer_new] - mus[layer_new]);
+                    PD[voz][vox + MAX_X] += pd;
+                }
+
+                if ((PD_MIN_LINE == voy) && (vox >= -MAX_X) && (vox < MAX_X + 1) && (voz < MAX_Z)){
+                        if ((int)(time / DT_PD) < MT_PD){
+                            pd = weight / mut[layer_new] * (mut[layer_new] - mus[layer_new]);
+                            TPD[(int)(time / DT_PD)][voz][vox + MAX_X] += pd;
+                        }
+                    }
+
+                weight = weight*mus[layer_new]/mut[layer_new];
+
+                NewStepSize();
+                NewDirection();
+            }
+        }
+        if (phot_in % 10 == 0){
+            Fnstop();
+        }
+        if (phot_in % 10000000 == 0){
+            SaveData();
+        }
+    }
 }
-
-static void Store_data(){
-	int		i,j,x,y,z;
-	long	time,time_SSP;
-	double	d1,d2,inner_product,theta;
-
-	time = labs((long)(((allpath*ref_ind)*SCALE / VC + source_time )/ DT));
-	time_SSP = labs((long)(((allpath*ref_ind)*SCALE / VC + source_time) / DT_SSP));
-
-/*	if (source_time == 1){
-		printf("sorce_time_ok\n");
-
-	}
-*/
-	for(i = 0; i < MAX_DET; i++){
-		inner_product = detector_dx[i] * dx + detector_dy[i] * dy + detector_dz[i] * dz;
-		theta = acos(inner_product);
-
-		if(detector_dz[i] == 1 || detector_dz[i] == -1){
-			d1 = (detector_x[i] - xnew) * (detector_x[i] - xnew);
-			d2 = (detector_y[i] - ynew) * (detector_y[i] - ynew);
-		}
-
-		if(sqrt(d1+d2) >= (double)detector_minradius/SCALE && sqrt(d1+d2) <= (double)detector_maxradius/SCALE && theta <= asin(detector_NA)){
-			phot_detected++;
-			for (j=0; j<MAX_LAYER; j++){
-				ppath[i][j] += sweight*path[j]*SCALE;
-
-				if((time >= 0) && (time < MT)){
-					tppath[i][time][j] += sweight*path[j]*SCALE;
-					tppath_y[i][time][j] += sweight*path_y[j] * SCALE;
-				}
-			}
-			for(z=0;z<MAX_Z;z++){
-				for(x=0;x<MAX_X*2;x++){
-									for(y=0;y<=MAX_Y*2;y++){
-					SSP[i][z][x][y] += sweight * path_for_ssp[z][x][y] * SCALE;
-									}
-				}
-			}
-			if((time_SSP >= 0) && (time_SSP < MT_SSP)){
-				intensity_for_ssp[i][time_SSP] += sweight;
-				for(z=0;z<MAX_Z;z++){
-					for(x=0;x<MAX_X*2;x++){
-						for(y=0;y<=MAX_Y*2;y++){
-						TSSP[i][time_SSP][z][x][y] += sweight * path_for_ssp[z][x][y] * SCALE;
-						}
-					}
-				}
-			}
-
-			if((time >= 0) && (time <MT)){
-				intensity[i][time] += sweight;
-			}
-			return;
-		}
-	}
-}
-
 
 static void Fnstop(){
-	int i;
-	unsigned long long int sec;
-	int month,day,hour,min;
+    fp_com = fopen(comfile, "w");
+    if (fp_com == NULL){
+        fprintf(stderr, "%s can not open\n", comfile);
+        exit(1);
+    }
 
-	time_end = time(NULL);
-	phot_end = phot_in;
-	sec = (double)(time_end - time_start)/(double)(phot_end - phot_start)*1000000000.0;
-	if((phot_end - phot_start) == 0){
-		sec = 0;
-	}
-	month = sec / (60*60*24*30);
-	sec = sec % (60*60*24*30);
-	day = sec / (60*60*24);
-	sec = sec % (60*60*24);
-	hour = sec / (60*60);
-	sec = sec % (60*60);
-	min = sec / 60;
-	sec = sec % 60;
+    unsigned long long int sec;
+    int month, day, hour, min;
 
-	fp_com = fopen(comfile, "r");
-	if (fp_com == NULL){
-		fprintf(stderr,"comfile can not open\n");
-		exit(1);
-	}
+    sec = (double)(time(NULL) - time_start)/(double)(phot_in - phot_start);
+    sec *= 1000000000;
+    if(phot_in - phot_start == 0){
+        sec = 0;
+    }
+    month = sec / (60*60*24*30);
+    sec = sec % (60*60*24*30);
+    day = sec / (60*60*24);
+    sec = sec % (60*60*24);
+    hour = sec / (60*60);
+    sec = sec % (60*60);
+    min = sec / 60;
+    sec = sec % 60;
 
-	fscanf(fp_com, "%c%*[^\n]", &ch);
-	getc(fp_com);
-	fclose(fp_com);
+    fprintf(fp_com, "<This file is created by 'montecarlo.c'>\n");
+    fprintf(fp_com, "number of input photons \t %12llu\n", phot_in);
+    fprintf(fp_com, "number of output photons \t %12llu\n", phot_out);
+    fprintf(fp_com, "number of detect photons \t %12llu\n", phot_detected);
+    fprintf(fp_com, "number of over time photon \t %12llu\n", phot_overtime);
+    fprintf(fp_com, "number of over path photon \t %12llu\n", phot_overpath);
+    fprintf(fp_com, "number of over scatter photon \t %12llu\n", phot_overscat);
+    fprintf(fp_com, "estimate time of 1B photon = %dM, %dD, %dH, %dM, %lluS\n\n",month,day,hour,min,sec);
 
-	fp_com = fopen(comfile, "w");
-	if (fp_com == NULL){
-		fprintf(stderr,"comfile can not open\n");
-		exit(1);
-	}
+    fprintf(fp_com, "Layer Num\tThickness\tmus\tmua\n");
+    for (i=0;i<MAX_LAYER;i++){
+        fprintf(fp_com, "%ld\t\t%d\t\t%6.4f\t%6.4f\n", i, thickness[i], mus[i], mua[i]);
+    }
 
-	fprintf(fp_com, "<This file is created by 'mc_fnirs_slab.c'>\n");
-	fprintf(fp_com, "number of input photons \t %12llu\n", phot_in);
-	fprintf(fp_com, "number of output photons \t %12llu\n", phot_out);
-	fprintf(fp_com, "number of detect photons \t %12llu\n", phot_detected);
-	fprintf(fp_com, "number of over time photon \t %12llu\n", phot_overtime);
-	fprintf(fp_com, "number of over path photon \t %12llu\n", phot_overpath);
-	fprintf(fp_com, "number of over scatter photon \t %12llu\n", phot_overscat);
-	fprintf(fp_com, "estimate time of 1B photon = %dM, %dD, %dH, %dM, %lluS\n\n",month,day,hour,min,sec);
+    fprintf(fp_com, "\nPhase function\t: g = %.1lf\n",g);
+    fprintf(fp_com, "Source NA\t: %.1f\n", source_NA);
+    fprintf(fp_com, "Source radius\t: Min = %.1f\tMax = %.1f\n", source_minrad, source_maxrad);
+    fprintf(fp_com, "Source\t\t: (x = %.1f, y = %.1f, z = %.1f)\n", source_x,source_y,source_z);
+    fprintf(fp_com, "Detector NA\t: %.1f\n", detector_NA);
+    fprintf(fp_com, "Detector radius\t: Min = %.1f\tMax = %.1f\n", detector_minrad,detector_maxrad);
+    for(i = 0; i < MAX_DET; i++){
+        fprintf(fp_com, "Detector[%ld]\t: (x = %.1f, y = %.1f, z = %.1f)\n", i, detector_x[i], detector_y[i], detector_z[i]);
+    }
 
-	fprintf(fp_com, "Layer Num\tThickness\tmus\tmua\n");
-	for (i=0;i<MAX_LAYER;i++){
-		fprintf(fp_com, "%d\t\t%d\t\t%6.4f\t%6.4f\n", i, thickness[i], mus[i], mua[i]);
-	}
+    if(phot_in >= phot_input){
+        stop_fg = TRUE;
+        fprintf(fp_com, "stop request");
+    }
 
-	fprintf(fp_com, "\nPhase function\t: %s (g = %.1lf)\n", angfile,g);
-	fprintf(fp_com, "Source NA\t: %.1f\n", source_NA);
-	fprintf(fp_com, "Source radius\t: Min = %.1f\tMax = %.1f\n", source_minradius, source_maxradius);
-	fprintf(fp_com, "Source\t\t: (x = %.1f, y = %.1f, z = %.1f)\n", source_x,source_y,source_z);
-	fprintf(fp_com, "Detector NA\t: %.1f\n", detector_NA);
-	fprintf(fp_com, "Detector radius\t: Min = %.1f\tMax = %.1f\n", detector_minradius,detector_maxradius);
-	for(i = 0; i < MAX_DET; i++){
-		fprintf(fp_com, "Detector[%d]\t: (x = %.1f, y = %.1f, z = %.1f)\n", i, detector_x[i], detector_y[i], detector_z[i]);
-	}
-
-	if ((ch=='y')||(ch=='Y'))
-	{
-		stop_fg = TRUE;
-		fprintf(fp_com, "stop request");
-	}
-	else{
-		stop_fg = FALSE;
-	}
-
-	fclose(fp_com);
+    fclose(fp_com);
 }
