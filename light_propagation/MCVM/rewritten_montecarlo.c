@@ -1,9 +1,9 @@
 /*
 
 Monte Carlo Program for voxel model
-Only records spatial intensity and partial path length
+from mc_fnirs_slab.c written by K.Takai[2014]
 
-written by S.Yamadate[2021]
+rewritten by S.Yamadate[2021]
 
 */
 
@@ -42,7 +42,7 @@ static string pathfile = "result_path.csv";
 #define MAX_Z       50       /* data save z (0 < MAX_Z)*/
 
 #define PD_MAX_LINE 5
-#define PD_MIN_LINE 1        /*y�������̋��߂�PD�̍��W�͈́i-80�`80�j�i�͈͂�10�ȓ��j*/
+#define PD_MIN_LINE 1
 
 #define MT          400      /* number of division for TPSF */
 #define DT          10
@@ -180,7 +180,7 @@ static double eweight; /* photon intensity at exit */
 
 static double totalpath;
 static int scatter_count;
-static int source_time = 0; /* NEEDS TO BE CHECKED */
+static int source_time = 0;
 /* ======================================================================== */
 
 /* subfunction declaration ================================================ */
