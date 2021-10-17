@@ -21,14 +21,14 @@ static FILE *fp_base, *fp_model, *fp_note, *fp_data, *fp_pd, *fp_ssp, *fp_com;
 static string baseconf = "settings.conf";
 static string modelconf = "model.conf";
 static string note = "temporary_note.txt";
-static string datafile = "binary.data";
-static string pdfile = "binary.pd";
-static string sspfile = "binary.ssp";
-static string comfile = "result.com";
+static string datafile = "../results/binary.data";
+static string pdfile = "../results/binary.pd";
+static string sspfile = "../results/binary.ssp";
+static string comfile = "../results/result.com";
 
 static FILE *fp_int, *fp_path;
-static string intfile = "result_intensity.csv";
-static string pathfile = "result_path.csv";
+static string intfile = "../results/result_intensity.csv";
+static string pathfile = "../results/result_path.csv";
 /* ======================================================================== */
 
 /* global variables to be altered ========================================= */
@@ -41,7 +41,7 @@ static string pathfile = "result_path.csv";
 #define MAX_Y       2        /* data save x (-MAX_X < MAX_X)*/
 #define MAX_Z       50       /* data save z (0 < MAX_Z)*/
 
-#define PD_MAX_LINE 5
+#define PD_MAX_LINE 20
 #define PD_MIN_LINE 1
 
 #define MT          400      /* number of division for TPSF */
@@ -180,7 +180,7 @@ static double eweight; /* photon intensity at exit */
 
 static double totalpath;
 static int scatter_count;
-static int source_time = 0;
+static int source_time = 0; /* NEEDS TO BE CHECKED */
 /* ======================================================================== */
 
 /* subfunction declaration ================================================ */
@@ -189,6 +189,7 @@ static void InitData(); /* initializes variables if file new */
 static void LoadData(); /* loads variables if result partially recorded */
 static void SaveData(); /* saves variables to binary data */
 static void Summary();
+static void SaveDataAsCsv();
 static void SetSeed();
 static double GenRand();
 static void PreCalculatedTable(); /* creates table of precalculated values */
@@ -229,7 +230,7 @@ int main(void){
     MonteCarlo();
 
     Summary();
-    SaveData();
+    SaveDataAsCsv();
 
     exit(0);
 }
@@ -426,6 +427,48 @@ void SaveData(){
     fclose(fp_data);
     fclose(fp_pd);
     fclose(fp_ssp);
+}
+
+void SaveDataAsCsv(){
+    /* intensity */
+    if((fp_int = fopen(intfile, "w")) == NULL){
+        fprintf(stderr, "%s can not open\n", intfile);
+        exit(1);
+    }
+
+    fprintf(fp_int, "time");
+    for(i = 0; i < MAX_DET; i++){
+        fprintf(fp_int, ",detector[%d]", (int) i);
+    }
+    fprintf(fp_int, "\n");
+    for(i = 0; i < MT; i++){
+        fprintf(fp_int, "%d", (int) (i + 1) * DT);
+        for(j = 0; j < MAX_DET; j++){
+            fprintf(fp_int, ",%.6e", intensity[j][i] / phot_in);
+        }
+        fprintf(fp_int, "\n");
+    }
+    fclose(fp_int);
+
+    /* partial path length */
+    if((fp_path = fopen(pathfile, "w")) == NULL){
+        fprintf(stderr, "%s can not open\n", pathfile);
+        exit(1);
+    }
+
+    for(int i = 0; i < MAX_Z; i++){
+        fprintf(fp_path, "depth: %d\n", i);
+        for(int j = 0; j < 2*MAX_Y+1; j++){
+            for(int k = 0; k < 2*MAX_X+1; k++){
+                fprintf(fp_path, "%lf", path_for_ssp[i][k][j]);
+                if(k != 2*MAX_X){
+                    fprintf(fp_path, ",");
+                }
+            }
+            fprintf(fp_path, "\n");
+        }
+    }
+    fclose(fp_path);
 }
 
 void SetSeed(){
@@ -711,6 +754,17 @@ void NewDirection(){
         }
     }
 }
+
+// void CheckSpecificVoxel(double pathlength){
+//     int iter;
+//     for(iter = 0; iter < VOX_NUM; iter++){
+//         if(special_voxel[i][0] == vox+MAX_X &&
+//            special_voxel[i][1] == voy-PD_MIN_LINE &&
+//            special_voxel[i][2] == voz){
+//                special_voxel[i][3] += pathlength;
+//         }
+//     }
+// }
 
 void RecordVoxelpath(){ // may be part to change
     int fg = 0;
@@ -1265,12 +1319,12 @@ void MonteCarlo(){
             Summary();
         }
         if(phot_in % 1000000 == 0){
-            SaveData();
+            SaveDataAsCsv();
         }
     }
 }
 
-static void Summary(){
+void Summary(){
     fp_com = fopen(comfile, "w");
     if (fp_com == NULL){
         fprintf(stderr, "%s can not open\n", comfile);
