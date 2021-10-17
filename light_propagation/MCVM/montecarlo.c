@@ -1,7 +1,7 @@
 /*
 
 Monte Carlo Program for voxel model
-Only records spatial intensity and partial path length
+Only records spatial intensity and partial path length at given depth
 
 written by S.Yamadate[2021]
 
@@ -37,12 +37,9 @@ static string pathfile = "../results/result_path.csv";
 
 #define SCALE       1.0      /* size of pixel*/
 
-#define MAX_X       60       /* data save x (-MAX_X < MAX_X)*/
-#define MAX_Y       2        /* data save x (-MAX_X < MAX_X)*/
-#define MAX_Z       50       /* data save z (0 < MAX_Z)*/
-
-#define PD_MAX_LINE 20
-#define PD_MIN_LINE 1
+#define MAX_X       15       /* data save x (-MAX_X < MAX_X)*/
+#define MAX_Y       15       /* data save y (-MAX_Y < MAX_Y)*/
+#define MAX_Z       30       /* data save z (0 < MAX_Z)*/
 
 #define MT          400      /* number of division for TPSF */
 #define DT          10
@@ -124,17 +121,14 @@ static unsigned long long int phot_overpath;  /* over-path photons */
 static unsigned long long int phot_overscat;  /* over-scattering photons */
 
 static double PD[MAX_Z][MAX_X*2+1];
-static double TPD[MT_PD][MAX_Z][MAX_X * 2 + 1];
-static double STPD[MT_PD];
+static double TPD[MT_PD][MAX_Z][MAX_X*2+1];
 static double SSP[MAX_DET][MAX_Z][MAX_X*2+1][MAX_Y*2+1];
 static double TSSP[MAX_DET][MT_SSP][MAX_Z][MAX_X*2+1][MAX_Y*2+1];
 
 static double path[MAX_LAYER];
-static double path_y[MAX_LAYER];
-static double path_for_ssp[MAX_Z][MAX_X*2+1][MAX_Y * 2 + 1];
+static double path_for_ssp[MAX_Z][MAX_X*2+1][MAX_Y*2+1];
 static double ppath[MAX_DET][MAX_LAYER];
 static double tppath[MAX_DET][MT][MAX_LAYER];
-static double tppath_y[MAX_DET][MT][MAX_LAYER];
 static double intensity[MAX_DET][MT];
 static double intensity_for_ssp[MAX_DET][MT_SSP];
 /* ======================================================================== */
@@ -180,7 +174,6 @@ static double eweight; /* photon intensity at exit */
 
 static double totalpath;
 static int scatter_count;
-static int source_time = 0; /* NEEDS TO BE CHECKED */
 /* ======================================================================== */
 
 /* subfunction declaration ================================================ */
@@ -198,7 +191,6 @@ static void MonteCarlo();
     /* function used within MonteCarlo() */
     static void SourcePosition(); /* photon position at source */
     static void SourceDirection(); /* photon direction at source */
-    static void SourceTime(); /* ?????? */
     static void CheckLayer(double z); /* layer which photon is in */
     static void NewStepSize(); /* new step size */
     static void NewDirection(); /* new scattered direction */
@@ -300,13 +292,11 @@ void InitData(){
 
     memset(ppath, 0, sizeof(ppath));
     memset(tppath, 0, sizeof(tppath));
-    memset(tppath_y, 0, sizeof(tppath_y));
     memset(intensity, 0, sizeof(intensity));
     memset(intensity_for_ssp, 0, sizeof(intensity_for_ssp));
 
     memset(PD, 0, sizeof(PD));
     memset(TPD, 0, sizeof(TPD));
-    memset(STPD, 0, sizeof(STPD));
     memset(SSP, 0, sizeof(SSP));
     memset(TSSP, 0, sizeof(TSSP));
 }
@@ -342,14 +332,12 @@ void LoadData(){
     /* values of binary.data */
     fread(ppath, sizeof(double), MAX_DET*MAX_LAYER, fp_data);
     fread(tppath, sizeof(double), MAX_DET*MT*MAX_LAYER, fp_data);
-    fread(tppath_y, sizeof(double), MAX_DET*MT*MAX_LAYER, fp_data);
     fread(intensity, sizeof(double), MAX_DET*MT, fp_data);
     fread(intensity_for_ssp, sizeof(double), MAX_DET*MT_SSP, fp_data);
 
     /* values of binary.pd */
     fread(PD, sizeof(double), MAX_Z*MAX_X*2+1, fp_pd);
     fread(TPD, sizeof(double), MT_PD*MAX_Z*(MAX_X * 2 + 1), fp_pd);
-    fread(STPD, sizeof(double), 4000+1, fp_pd);
 
     /* values of binary.ssp */
     fread(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1), fp_ssp);
@@ -392,7 +380,6 @@ void SaveData(){
     /* values for binary.data */
     fwrite(ppath, sizeof(double), MAX_DET*MAX_LAYER, fp_data);
     fwrite(tppath, sizeof(double), MAX_DET*MT*MAX_LAYER, fp_data);
-    fwrite(tppath_y, sizeof(double), MAX_DET*MT*MAX_LAYER, fp_data);
     fwrite(intensity, sizeof(double), MAX_DET*MT, fp_data);
     fwrite(intensity_for_ssp, sizeof(double), MAX_DET*MT_SSP, fp_data);
 
@@ -411,15 +398,12 @@ void SaveData(){
             }
         }
     }
-    for(t = 0; t < 4000; t++){
-        STPD[t] /= SCALE * SCALE * SCALE;
-    }
     fwrite(PD, sizeof(double), MAX_Z*MAX_X*2+1,fp_pd);
     fwrite(TPD, sizeof(double), MT_PD*MAX_Z*(MAX_X * 2 + 1), fp_pd);
-    fwrite(STPD, sizeof(double), 4000+1, fp_pd);
 
     /* values for binary.ssp */
-    fwrite(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1), fp_ssp);
+    fwrite(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1),
+           fp_ssp);
     fwrite(TSSP, sizeof(double), MAX_DET*MT_SSP*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1),
            fp_ssp);
 
@@ -678,13 +662,6 @@ void SourceDirection(){
     dz /= norm;
 }
 
-void SourceTime(){
-    temp = GenRand();
-    if(0 <= temp && temp <= 1){
-        source_time = 0;
-    }
-}
-
 void CheckLayer(double z){
     if(z < 0){
         printf("error: invalid z coordinate, (z = %lf)\n", z);
@@ -755,18 +732,7 @@ void NewDirection(){
     }
 }
 
-// void CheckSpecificVoxel(double pathlength){
-//     int iter;
-//     for(iter = 0; iter < VOX_NUM; iter++){
-//         if(special_voxel[i][0] == vox+MAX_X &&
-//            special_voxel[i][1] == voy-PD_MIN_LINE &&
-//            special_voxel[i][2] == voz){
-//                special_voxel[i][3] += pathlength;
-//         }
-//     }
-// }
-
-void RecordVoxelpath(){ // may be part to change
+void RecordVoxelpath(){
     int fg = 0;
     double lx, ly, lz;
     double xtemp, ytemp, ztemp, ltemp;
@@ -834,14 +800,10 @@ void RecordVoxelpath(){ // may be part to change
         if(lx < ly && lx < lz && lx <= temp){
             ltemp += lx;
             path[layer_old] += lx;
-            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+            if(-1 * MAX_Y <= voy && voy <= MAX_Y &&
                0 <= voz && voz < MAX_Z &&
                -1 * MAX_X <= vox && vox < MAX_X + 1){
-                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += lx;
-
-                   if(voy == (int) source_y){
-                       path_y[layer_old] += lx;
-                   }
+                   path_for_ssp[voz][vox+MAX_X][voy+MAX_Y] += lx;
             }
 
             temp = temp - lx;
@@ -859,14 +821,10 @@ void RecordVoxelpath(){ // may be part to change
         else if(ly < lx && ly < lz && ly <= temp){
             ltemp += ly;
             path[layer_old] += ly;
-            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+            if(-1 * MAX_Y <= voy && voy <= MAX_Y &&
                0 <= voz && voz < MAX_Z &&
                -1 * MAX_X <= vox && vox < MAX_X + 1){
-                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += ly;
-
-                   if(voy == (int) source_y){
-                       path_y[layer_old] += ly;
-                   }
+                   path_for_ssp[voz][vox+MAX_X][voy+MAX_Y] += ly;
             }
 
             temp = temp - ly;
@@ -884,14 +842,10 @@ void RecordVoxelpath(){ // may be part to change
         else if(lz < lx && lz < ly && lz <= temp){
             ltemp += lz;
             path[layer_old] += lz;
-            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+            if(-1 * MAX_Y <= voy && voy <= MAX_Y &&
                0 <= voz && voz < MAX_Z &&
                -1 * MAX_X <= vox && vox < MAX_X + 1){
-                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += lz;
-
-                   if(voy == (int) source_y){
-                       path_y[layer_old] += lz;
-                   }
+                   path_for_ssp[voz][vox+MAX_X][voy+MAX_Y] += lz;
             }
 
             temp = temp - lz;
@@ -909,14 +863,10 @@ void RecordVoxelpath(){ // may be part to change
         else if(lx == ly && lx < lz && lx <= temp){
             ltemp += lx;
             path[layer_old] += lx;
-            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+            if(-1 * MAX_Y <= voy && voy <= MAX_Y &&
                0 <= voz && voz < MAX_Z &&
                -1 * MAX_X <= vox && vox < MAX_X + 1){
-                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += lx;
-
-                   if(voy == (int) source_y){
-                       path_y[layer_old] += lx;
-                   }
+                   path_for_ssp[voz][vox+MAX_X][voy+MAX_Y] += lx;
             }
 
             temp = temp - lx;
@@ -941,14 +891,10 @@ void RecordVoxelpath(){ // may be part to change
         else if(lx < ly && lx == lz && lx <= temp){
             ltemp += lx;
             path[layer_old] += lx;
-            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+            if(-1 * MAX_Y <= voy && voy <= MAX_Y &&
                0 <= voz && voz < MAX_Z &&
                -1 * MAX_X <= vox && vox < MAX_X + 1){
-                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += lx;
-
-                   if(voy == (int) source_y){
-                       path_y[layer_old] += lx;
-                   }
+                   path_for_ssp[voz][vox+MAX_X][voy+MAX_Y] += lx;
             }
 
             temp = temp - lx;
@@ -973,14 +919,10 @@ void RecordVoxelpath(){ // may be part to change
         else if(ly < lx && ly == lz && ly <= temp){
             ltemp += ly;
             path[layer_old] += ly;
-            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+            if(-1 * MAX_Y <= voy && voy <= MAX_Y &&
                0 <= voz && voz < MAX_Z &&
                -1 * MAX_X <= vox && vox < MAX_X + 1){
-                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += ly;
-
-                   if(voy == (int) source_y){
-                       path_y[layer_old] += ly;
-                   }
+                   path_for_ssp[voz][vox+MAX_X][voy+MAX_Y] += ly;
             }
 
             temp = temp - ly;
@@ -1005,14 +947,10 @@ void RecordVoxelpath(){ // may be part to change
         else if(lx == ly && ly == lz && lx == lz && lx <= temp){
             ltemp += lx;
             path[layer_old] += lx;
-            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+            if(-1 * MAX_Y <= voy && voy <= MAX_Y &&
                0 <= voz && voz < MAX_Z &&
                -1 * MAX_X <= vox && vox < MAX_X + 1){
-                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += lx;
-
-                   if(voy == (int) source_y){
-                       path_y[layer_old] += lx;
-                   }
+                   path_for_ssp[voz][vox+MAX_X][voy+MAX_Y] += lx;
             }
 
             temp = temp - lx;
@@ -1044,21 +982,17 @@ void RecordVoxelpath(){ // may be part to change
         else if(temp < lx && temp < ly && temp < lz){
             ltemp += temp;
             path[layer_old] += temp;
-            if(PD_MIN_LINE <= voy && voy <= PD_MAX_LINE &&
+            if(-1 * MAX_Y <= voy && voy <= MAX_Y &&
                0 <= voz && voz < MAX_Z &&
                -1 * MAX_X <= vox && vox < MAX_X + 1){
-                   path_for_ssp[voz][vox+MAX_X][voy-PD_MIN_LINE] += temp;
-
-                   if(voy == (int) source_y){
-                       path_y[layer_old] += temp;
-                   }
+                   path_for_ssp[voz][vox+MAX_X][voy+MAX_Y] += temp;
             }
 
             temp = 0;
             fg = 1;
         }
         else{
-            printf("error: unexpected condition given for path calculation\n");
+            printf("error: unexpected condition given in RecordVoxelpath\n");
             printf("(lx,ly,lz,temp) = (%lf,%lf,%lf,%lf)\n", lx, ly, lz, temp);
             exit(1);
         }
@@ -1100,13 +1034,13 @@ void FixPath(){
     znew = cross_z;
 }
 
-void RecordExit(){ // may be part to change
+void RecordExit(){
     int x, y, z;
     long t, tssp;
     double theta, d1, d2;
 
-    t = (long) fabs((totalpath * REF_IND * SCALE / VC + source_time) / DT);
-    tssp = (long) fabs((totalpath * REF_IND * SCALE / VC + source_time) / DT_SSP);
+    t = (long) fabs((totalpath * REF_IND * SCALE / VC) / DT);
+    tssp = (long) fabs((totalpath * REF_IND * SCALE / VC) / DT_SSP);
 
     for(i = 0; i < MAX_DET; i++){
         theta = acos(detector_dx[i] * dx +
@@ -1127,7 +1061,6 @@ void RecordExit(){ // may be part to change
                    ppath[i][j] += eweight * path[j] * SCALE;
                    if(t >= 0 && t < MT){
                        tppath[i][t][j] += eweight * path[j] * SCALE;
-                       tppath_y[i][t][j] += eweight * path_y[j] * SCALE;
                    }
                }
                for(z = 0; z < MAX_Z; z++){
@@ -1215,7 +1148,6 @@ void MonteCarlo(){
 
         phot_in ++;
         memset(path, 0, sizeof(path));
-        memset(path_y, 0, sizeof(path_y));
         memset(path_for_ssp, 0, sizeof(path_for_ssp));
         totalpath = 0;
 
@@ -1224,8 +1156,6 @@ void MonteCarlo(){
         zold = source_z;
         SourcePosition();
         SourceDirection();
-
-        SourceTime();
 
         if(zold < 0){
             printf("error: invalid source position\n");
@@ -1247,7 +1177,7 @@ void MonteCarlo(){
             xnew = xold + step * dx;
             ynew = yold + step * dy;
             znew = zold + step * dz;
-            t = (long)(totalpath * REF_IND * SCALE / VC + source_time);
+            t = (long)(totalpath * REF_IND * SCALE / VC);
 
             /* when photon exits */
             if(znew < 0){
@@ -1296,7 +1226,7 @@ void MonteCarlo(){
                         PD[voz][vox + MAX_X] += pd;
                 }
 
-                if (voy == PD_MIN_LINE &&
+                if (voy == -1 * MAX_Y &&
                     -1 * MAX_X <= vox && vox < MAX_X + 1 &&
                     voz < MAX_Z){
                         if ((int)(t / DT_PD) < MT_PD){
