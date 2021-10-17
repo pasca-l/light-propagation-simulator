@@ -28,7 +28,7 @@ static string comfile = "../results/result.com";
 
 static FILE *fp_int, *fp_path;
 static string intfile = "../results/result_intensity.csv";
-static string pathfile = "../results/result_path.csv";
+static string pathfile = "../results/result_ssp.csv";
 /* ======================================================================== */
 
 /* global variables to be altered ========================================= */
@@ -74,7 +74,7 @@ static unsigned long val[N] = {
     0x512c0c03, 0xea857ccd, 0x4cc1d30f, 0x8891a8a1, 0xa6b7aadb
 };
 static unsigned long mag[2] = {0x0, 0x8ebfd028};
-static int k = 0;
+static int randnum_counter = 0;
 /* ======================================================================== */
 
 /* variables to read from file ============================================ */
@@ -124,13 +124,14 @@ static double PD[MAX_Z][MAX_X*2+1];
 static double TPD[MT_PD][MAX_Z][MAX_X*2+1];
 static double SSP[MAX_DET][MAX_Z][MAX_X*2+1][MAX_Y*2+1];
 static double TSSP[MAX_DET][MT_SSP][MAX_Z][MAX_X*2+1][MAX_Y*2+1];
+static double PPATH[MAX_DET][MAX_LAYER];
+static double TPPATH[MAX_DET][MT][MAX_LAYER];
+static double INTENSITY[MAX_DET][MT];
+static double intensity_for_ssp[MAX_DET][MT_SSP]; /*???*/
 
+/* temporal recording array per input photon */
 static double path[MAX_LAYER];
 static double path_for_ssp[MAX_Z][MAX_X*2+1][MAX_Y*2+1];
-static double ppath[MAX_DET][MAX_LAYER];
-static double tppath[MAX_DET][MT][MAX_LAYER];
-static double intensity[MAX_DET][MT];
-static double intensity_for_ssp[MAX_DET][MT_SSP];
 /* ======================================================================== */
 
 /* variables for precalculation =========================================== */
@@ -194,14 +195,13 @@ static void MonteCarlo();
     static void CheckLayer(double z); /* layer which photon is in */
     static void NewStepSize(); /* new step size */
     static void NewDirection(); /* new scattered direction */
-    static void RecordVoxelpath();
+    static void RecordVoxelpath(); /* record path at each voxel */
     static void FixPath(); /* fix path length and position */
-    static void RecordExit();
+    static void RecordExit(); /* record property of exited photon */
     static void CalculateRef();
 /* ======================================================================== */
 
-/* dummy variables ======================================================== */
-long i, j, r1, r2;
+/* dummy variable ========================================================= */
 double temp;
 /* ======================================================================== */
 
@@ -260,7 +260,7 @@ void LoadSettings(){
     fscanf(fp_model, "%lf%*[^\n]%*c", &detector_NA);
     fscanf(fp_model, "%lf%*[^\n]%*c", &detector_minrad);
     fscanf(fp_model, "%lf%*[^\n]%*c", &detector_maxrad);
-    for(i = 0; i < MAX_DET; i++){
+    for(int i = 0; i < MAX_DET; i++){
         fscanf(fp_model, "%lf%*[^\n]%*c", &detector_x[i]);
         fscanf(fp_model, "%lf%*[^\n]%*c", &detector_y[i]);
         fscanf(fp_model, "%lf%*[^\n]%*c", &detector_z[i]);
@@ -269,7 +269,7 @@ void LoadSettings(){
         fscanf(fp_model, "%lf%*[^\n]%*c", &detector_dz[i]);
     }
 
-    for(i = 0; i < MAX_LAYER; i++){
+    for(int i = 0; i < MAX_LAYER; i++){
         fscanf(fp_model, "%d%*[^\n]%*c", &width[i]);
         fscanf(fp_model, "%lf%*[^\n]%*c", &mus[i]);
         fscanf(fp_model, "%lf%*[^\n]%*c", &mua[i]);
@@ -290,9 +290,9 @@ void InitData(){
     phot_overpath = 0;
     phot_overscat = 0;
 
-    memset(ppath, 0, sizeof(ppath));
-    memset(tppath, 0, sizeof(tppath));
-    memset(intensity, 0, sizeof(intensity));
+    memset(PPATH, 0, sizeof(PPATH));
+    memset(TPPATH, 0, sizeof(TPPATH));
+    memset(INTENSITY, 0, sizeof(INTENSITY));
     memset(intensity_for_ssp, 0, sizeof(intensity_for_ssp));
 
     memset(PD, 0, sizeof(PD));
@@ -330,9 +330,9 @@ void LoadData(){
     phot_start = phot_in;
 
     /* values of binary.data */
-    fread(ppath, sizeof(double), MAX_DET*MAX_LAYER, fp_data);
-    fread(tppath, sizeof(double), MAX_DET*MT*MAX_LAYER, fp_data);
-    fread(intensity, sizeof(double), MAX_DET*MT, fp_data);
+    fread(PPATH, sizeof(double), MAX_DET*MAX_LAYER, fp_data);
+    fread(TPPATH, sizeof(double), MAX_DET*MT*MAX_LAYER, fp_data);
+    fread(INTENSITY, sizeof(double), MAX_DET*MT, fp_data);
     fread(intensity_for_ssp, sizeof(double), MAX_DET*MT_SSP, fp_data);
 
     /* values of binary.pd */
@@ -378,9 +378,9 @@ void SaveData(){
     fprintf(fp_note, "%12llu\n", phot_overscat);
 
     /* values for binary.data */
-    fwrite(ppath, sizeof(double), MAX_DET*MAX_LAYER, fp_data);
-    fwrite(tppath, sizeof(double), MAX_DET*MT*MAX_LAYER, fp_data);
-    fwrite(intensity, sizeof(double), MAX_DET*MT, fp_data);
+    fwrite(PPATH, sizeof(double), MAX_DET*MAX_LAYER, fp_data);
+    fwrite(TPPATH, sizeof(double), MAX_DET*MT*MAX_LAYER, fp_data);
+    fwrite(INTENSITY, sizeof(double), MAX_DET*MT, fp_data);
     fwrite(intensity_for_ssp, sizeof(double), MAX_DET*MT_SSP, fp_data);
 
     /* values for binary.pd */
@@ -402,8 +402,7 @@ void SaveData(){
     fwrite(TPD, sizeof(double), MT_PD*MAX_Z*(MAX_X * 2 + 1), fp_pd);
 
     /* values for binary.ssp */
-    fwrite(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1),
-           fp_ssp);
+    fwrite(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1), fp_ssp);
     fwrite(TSSP, sizeof(double), MAX_DET*MT_SSP*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1),
            fp_ssp);
 
@@ -421,14 +420,14 @@ void SaveDataAsCsv(){
     }
 
     fprintf(fp_int, "time");
-    for(i = 0; i < MAX_DET; i++){
-        fprintf(fp_int, ",detector[%d]", (int) i);
+    for(int i = 0; i < MAX_DET; i++){
+        fprintf(fp_int, ",detector[%d]", i);
     }
     fprintf(fp_int, "\n");
-    for(i = 0; i < MT; i++){
-        fprintf(fp_int, "%d", (int) (i + 1) * DT);
-        for(j = 0; j < MAX_DET; j++){
-            fprintf(fp_int, ",%.6e", intensity[j][i] / phot_in);
+    for(int i = 0; i < MT; i++){
+        fprintf(fp_int, "%d", (i + 1) * DT);
+        for(int j = 0; j < MAX_DET; j++){
+            fprintf(fp_int, ",%.6e", INTENSITY[j][i] / phot_in);
         }
         fprintf(fp_int, "\n");
     }
@@ -440,16 +439,18 @@ void SaveDataAsCsv(){
         exit(1);
     }
 
-    for(int i = 0; i < MAX_Z; i++){
-        fprintf(fp_path, "depth: %d\n", i);
-        for(int j = 0; j < 2*MAX_Y+1; j++){
-            for(int k = 0; k < 2*MAX_X+1; k++){
-                fprintf(fp_path, "%lf", path_for_ssp[i][k][j]);
-                if(k != 2*MAX_X){
-                    fprintf(fp_path, ",");
+    for(int i = 0; i < MAX_DET; i++){
+        for(int z = 0; z < MAX_Z; z++){
+            fprintf(fp_path, "depth: %d\n", z);
+            for(int y = 0; y < 2*MAX_Y+1; y++){
+                for(int x = 0; x < 2*MAX_X+1; x++){
+                    fprintf(fp_path, "%lf", SSP[i][z][x][y]);
+                    if(x != 2*MAX_X){
+                        fprintf(fp_path, ",");
+                    }
                 }
+                fprintf(fp_path, "\n");
             }
-            fprintf(fp_path, "\n");
         }
     }
     fclose(fp_path);
@@ -459,11 +460,11 @@ void SetSeed(){
     unsigned long time_now;
     time((time_t *) &time_now); /* sec since 00:00:00 1/1/1970 */
 
-    for(j = 0; j < N; j++){
+    for(int j = 0; j < N; j++){
         val[j] -= time_now;
     }
 
-    for(j = 0; j <= 150; j++){ /* exercise the system routine (???) */
+    for(int j = 0; j <= 150; j++){ /* exercise the system routine (???) */
         GenRand();
     }
 }
@@ -471,36 +472,36 @@ void SetSeed(){
 double GenRand(){
     unsigned long y;
 
-    if(k == N){
-        for(i = 0; i < N - M; i++){
+    if(randnum_counter == N){
+        for(int i = 0; i < N - M; i++){
             val[i] = val[i+M] ^ (val[i] >> 1) ^ mag[val[i] % 2];
         }
-        for(i = N - M; i < N; i++){
+        for(int i = N - M; i < N; i++){
             val[i] = val[i+M-N] ^ (val[i] >> 1) ^ mag[val[i] % 2];
         }
-        k = 0;
+        randnum_counter = 0;
     }
 
-    y = val[k];
+    y = val[randnum_counter];
     y ^= (y << 7) & 0x2b5b2500;
     y ^= (y << 15) & 0xdb8b0000;
     y &= 0xffffffff;
     y ^= (y >> 16);
 
-    k++;
+    randnum_counter++;
 
     return ((double) y / (unsigned long) 0xffffffff);
 }
 
 void PreCalculatedTable(){
     /* table for step size */
-    for(i = 1; i < TABLEN; i++){
+    for(int i = 1; i < TABLEN; i++){
         stepsize_table[i-1] = -log((double) i / TABLEN) / SCALE;
     }
 
     /* table for direction at source */
     double theta, psi;
-    for(i = 0; i <= TABLEN; i++){
+    for(int i = 0; i <= TABLEN; i++){
         theta = asin(source_NA) * i / TABLEN;
         psi = 2 * PI * i / (double)TABLEN;
 
@@ -516,7 +517,7 @@ void PreCalculatedTable(){
     /* table for reflection */
     double t1, t2, t3, t4, th1, th2;
     if(ref_fg == 0){
-        for(i = 0; i <= 1000; i++){
+        for(int i = 0; i <= 1000; i++){
             ref_in[i] = 0;
             ref_out[i] = 0;
         }
@@ -529,7 +530,7 @@ void PreCalculatedTable(){
         ref_in[1000] = t1 * t1;
         ref_out[1000] = ref_in[1000];
 
-        for(i = 1; i < 1000; i++){
+        for(int i = 1; i < 1000; i++){
             /* calculating ref_in values */
             t1 = (double) i / 1000;
             t2 = sqrt(1 - t1 * t1);
@@ -563,7 +564,7 @@ void PreCalculatedTable(){
         }
     }
     else if(ref_fg == 2){
-        for(i = 0; i <= 1000; i++){
+        for(int i = 0; i <= 1000; i++){
             ref_in[i] = 0;
             t1 = (double) i / 1000;
             t1 = sqrt(1 - t1 * t1) * REF_IND;
@@ -582,7 +583,7 @@ void PreCalculatedTable(){
 
     /* table for new direction */
     double c1, c2, c3;
-    for(i = 0; i <= TABLEN; i++){
+    for(int i = 0; i <= TABLEN; i++){
         theta = (double) i / TABLEN;
 
         if(g == 0){
@@ -629,6 +630,7 @@ void SourcePosition(){
 }
 
 void SourceDirection(){
+    long r1, r2;
     double norm;
 
     r1 = (long) GenRand() * (TABLEN - 1);
@@ -669,7 +671,7 @@ void CheckLayer(double z){
     }
 
     int layer_min = 0;
-    for(i = 0; i < MAX_LAYER; i++){
+    for(int i = 0; i < MAX_LAYER; i++){
         if(z >= layer_min && z < (layer_min + width[i])){
             layer_new = i;
             break;
@@ -684,18 +686,21 @@ void CheckLayer(double z){
 }
 
 void NewStepSize(){
-    r1 = (long) (GenRand() * ((double) TABLEN - 2));
+    long r;
 
-    step = stepsize_table[r1] / mut[layer_new];
+    r = (long) (GenRand() * ((double) TABLEN - 2));
+
+    step = stepsize_table[r] / mut[layer_new];
     if(step == 0){
         printf("step size set to V0:\nrand = %ld\nstep = %lf\n",
-                r1, stepsize_table[r1]);
+                r, stepsize_table[r]);
         step = MIN_RAND;
     }
 }
 
 void NewDirection(){
     double dr1, dr2, dr3;
+    long r1, r2;
 
     r1 = (long) (GenRand() * ((double) TABLEN - 1));
     r2 = (long) (GenRand() * ((double) TABLEN - 1));
@@ -1042,7 +1047,7 @@ void RecordExit(){
     t = (long) fabs((totalpath * REF_IND * SCALE / VC) / DT);
     tssp = (long) fabs((totalpath * REF_IND * SCALE / VC) / DT_SSP);
 
-    for(i = 0; i < MAX_DET; i++){
+    for(int i = 0; i < MAX_DET; i++){
         theta = acos(detector_dx[i] * dx +
                      detector_dy[i] * dy +
                      detector_dz[i] * dz);
@@ -1057,10 +1062,10 @@ void RecordExit(){
            theta <= asin(detector_NA)){
                phot_detected++;
 
-               for(j = 0; j < MAX_LAYER; j++){
-                   ppath[i][j] += eweight * path[j] * SCALE;
+               for(int j = 0; j < MAX_LAYER; j++){
+                   PPATH[i][j] += eweight * path[j] * SCALE;
                    if(t >= 0 && t < MT){
-                       tppath[i][t][j] += eweight * path[j] * SCALE;
+                       TPPATH[i][t][j] += eweight * path[j] * SCALE;
                    }
                }
                for(z = 0; z < MAX_Z; z++){
@@ -1085,7 +1090,7 @@ void RecordExit(){
                }
 
                if(t >= 0 && t < MT){
-                   intensity[i][t] += eweight;
+                   INTENSITY[i][t] += eweight;
                }
         }
     }
@@ -1147,6 +1152,8 @@ void MonteCarlo(){
         }
 
         phot_in ++;
+        // path and path_for_ssp might be only for temporary recording
+        // which needs to for SSP to be determined
         memset(path, 0, sizeof(path));
         memset(path_for_ssp, 0, sizeof(path_for_ssp));
         totalpath = 0;
@@ -1283,8 +1290,8 @@ void Summary(){
     fprintf(fp_com, "time taken : %dD, %dH, %dM, %lluS\n\n",day,hour,min,sec);
 
     fprintf(fp_com, "layer width mus mua\n");
-    for (i=0;i<MAX_LAYER;i++){
-        fprintf(fp_com, "%ld %d %.4f %.4f\n", i, width[i], mus[i], mua[i]);
+    for(int i = 0; i < MAX_LAYER; i++){
+        fprintf(fp_com, "%d %d %.4f %.4f\n", i, width[i], mus[i], mua[i]);
     }
 
     fprintf(fp_com, "\nphase function:  g = %.1lf\n",g);
@@ -1296,8 +1303,8 @@ void Summary(){
     fprintf(fp_com, "detector NA:     %.1f\n", detector_NA);
     fprintf(fp_com, "detector radius: Min = %.1f\tMax = %.1f\n",
             detector_minrad, detector_maxrad);
-    for(i = 0; i < MAX_DET; i++){
-        fprintf(fp_com, "detector[%ld]:     (x = %.1f, y = %.1f, z = %.1f)\n",
+    for(int i = 0; i < MAX_DET; i++){
+        fprintf(fp_com, "detector[%d]:     (x = %.1f, y = %.1f, z = %.1f)\n",
                 i, detector_x[i], detector_y[i], detector_z[i]);
     }
 
