@@ -32,8 +32,8 @@ static string pathfile = "../results/result_ssp.csv";
 /* ======================================================================== */
 
 /* global variables to be altered ========================================= */
-#define MAX_DET     1 /* number of detectors */
-#define MAX_LAYER   5 /* number of layers in model*/
+#define MAX_DET     1        /* number of detectors */
+#define MAX_LAYER   5        /* number of layers in model*/
 
 #define SCALE       1.0      /* size of pixel*/
 
