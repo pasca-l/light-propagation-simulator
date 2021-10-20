@@ -1300,14 +1300,14 @@ void MonteCarlo(){
         if(phot_in >= phot_input){
             stop_fg = TRUE;
         }
-        if(phot_in % (phot_input / 100) == 0){
+        if(phot_in % (phot_input / 1000) == 0){
             Summary();
         }
-        if(phot_in % (phot_input / 10) == 0){
+        if(phot_in % (phot_input / 100) == 0){
             SaveData();
 
             /* show progress */
-            printf("%lld percent done\n", phot_in / (phot_input / 100));
+            printf("%lld%% done\n", phot_in / (phot_input / 100));
         }
     }
 }
