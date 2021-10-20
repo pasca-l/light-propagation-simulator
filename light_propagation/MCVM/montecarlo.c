@@ -1199,12 +1199,6 @@ void MonteCarlo(){
     stop_fg = FALSE;
 
     while(phot_in < phot_input && stop_fg == FALSE){
-
-        /* show progress */
-        if(phot_in % (phot_input / 10) == 0){
-            printf("%lld percent done\n", phot_in / (phot_input / 100));
-        }
-
         phot_in ++;
         // path and path_for_ssp might be only for temporary recording
         // which needs to for SSP to be determined
@@ -1306,11 +1300,14 @@ void MonteCarlo(){
         if(phot_in >= phot_input){
             stop_fg = TRUE;
         }
-        if(phot_in % 1000 == 0){
+        if(phot_in % (phot_input / 100) == 0){
             Summary();
         }
-        if(phot_in % 1000000 == 0){
-            SaveDataAsCsv();
+        if(phot_in % (phot_input / 10) == 0){
+            SaveData();
+
+            /* show progress */
+            printf("%lld percent done\n", phot_in / (phot_input / 100));
         }
     }
 }
