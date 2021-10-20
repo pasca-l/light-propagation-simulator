@@ -20,7 +20,7 @@ typedef char string[STRSIZE];
 static FILE *fp_base, *fp_model, *fp_note, *fp_data, *fp_pd, *fp_ssp, *fp_com;
 static string baseconf = "settings.conf";
 static string modelconf = "model.conf";
-static string note = "temporary_note.txt";
+static string note = "../results/temporary_note.txt";
 static string datafile = "../results/binary.data";
 static string pdfile = "../results/binary.pd";
 static string sspfile = "../results/binary.ssp";
