@@ -24,11 +24,11 @@ static string note = "temporary_note.txt";
 static string datafile = "../results/binary.data";
 static string pdfile = "../results/binary.pd";
 static string sspfile = "../results/binary.ssp";
-static string comfile = "../results/result.com";
+static string comfile = "../results/summary.com";
 
 static FILE *fp_int, *fp_path;
-static string intfile = "../results/result_intensity.csv";
-static string pathfile = "../results/result_ssp.csv";
+static string intfile = "../results/intensity.csv";
+static string pathfile = "../results/ssp.csv";
 /* ======================================================================== */
 
 /* global variables to be altered ========================================= */
@@ -37,9 +37,9 @@ static string pathfile = "../results/result_ssp.csv";
 
 #define SCALE       1.0      /* size of pixel*/
 
-#define MAX_X       15       /* data save x (-MAX_X < MAX_X)*/
-#define MAX_Y       15       /* data save y (-MAX_Y < MAX_Y)*/
-#define MAX_Z       30       /* data save z (0 < MAX_Z)*/
+#define MAX_X       30       /* data save x (-MAX_X < MAX_X)*/
+#define MAX_Y       30       /* data save y (-MAX_Y < MAX_Y)*/
+#define MAX_Z       28       /* data save z (0 < MAX_Z)*/
 
 #define MT          400      /* number of division for TPSF */
 #define DT          10
@@ -350,6 +350,60 @@ void LoadData(){
     fclose(fp_ssp);
 }
 
+void Summary(){
+    fp_com = fopen(comfile, "w");
+    if (fp_com == NULL){
+        fprintf(stderr, "%s can not open\n", comfile);
+        exit(1);
+    }
+
+    unsigned long long int sec;
+    int month, day, hour, min;
+
+    sec = (double)(time(NULL) - time_start);
+
+    day = sec / (60*60*24);
+    sec = sec % (60*60*24);
+    hour = sec / (60*60);
+    sec = sec % (60*60);
+    min = sec / 60;
+    sec = sec % 60;
+
+    fprintf(fp_com, "<This file is created by 'montecarlo.c'>\n");
+    fprintf(fp_com, "input photons        %12llu\n", phot_in);
+    fprintf(fp_com, "output photons       %12llu\n", phot_out);
+    fprintf(fp_com, "detect photons       %12llu\n", phot_detected);
+    fprintf(fp_com, "over time photons    %12llu\n", phot_overtime);
+    fprintf(fp_com, "over path photons    %12llu\n", phot_overpath);
+    fprintf(fp_com, "over scatter photons %12llu\n", phot_overscat);
+    fprintf(fp_com, "time taken : %dD, %dH, %dM, %lluS\n\n",day,hour,min,sec);
+
+    fprintf(fp_com, "layer width mus mua\n");
+    for(int i = 0; i < MAX_LAYER; i++){
+        fprintf(fp_com, "%d %d %.4f %.4f\n", i, width[i], mus[i], mua[i]);
+    }
+
+    fprintf(fp_com, "\nphase function:  g = %.1lf\n",g);
+    fprintf(fp_com, "source NA:       %.1f\n", source_NA);
+    fprintf(fp_com, "source radius:   Min = %.1f\tMax = %.1f\n",
+            source_minrad, source_maxrad);
+    fprintf(fp_com, "source:          (x = %.1f, y = %.1f, z = %.1f)\n",
+            source_x, source_y, source_z);
+    fprintf(fp_com, "detector NA:     %.1f\n", detector_NA);
+    fprintf(fp_com, "detector radius: Min = %.1f\tMax = %.1f\n",
+            detector_minrad, detector_maxrad);
+    for(int i = 0; i < MAX_DET; i++){
+        fprintf(fp_com, "detector[%d]:     (x = %.1f, y = %.1f, z = %.1f)\n",
+                i, detector_x[i], detector_y[i], detector_z[i]);
+    }
+
+    if(stop_fg == TRUE){
+        fprintf(fp_com, "\nCOMPLETED");
+    }
+
+    fclose(fp_com);
+}
+
 void SaveData(){
     /* error handling for non existing files or content */
     if((fp_note = fopen(note, "w")) == NULL){
@@ -398,8 +452,8 @@ void SaveData(){
             }
         }
     }
-    fwrite(PD, sizeof(double), MAX_Z*MAX_X*2+1,fp_pd);
-    fwrite(TPD, sizeof(double), MT_PD*MAX_Z*(MAX_X * 2 + 1), fp_pd);
+    fwrite(PD, sizeof(double), MAX_Z*MAX_X*2+1, fp_pd);
+    fwrite(TPD, sizeof(double), MT_PD*MAX_Z*(MAX_X*2+1), fp_pd);
 
     /* values for binary.ssp */
     fwrite(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1), fp_ssp);
@@ -440,8 +494,8 @@ void SaveDataAsCsv(){
     }
 
     for(int i = 0; i < MAX_DET; i++){
+        fprintf(fp_path, "Record of %d depths\n", MAX_Z);
         for(int z = 0; z < MAX_Z; z++){
-            fprintf(fp_path, "depth: %d\n", z);
             for(int y = 0; y < 2*MAX_Y+1; y++){
                 for(int x = 0; x < 2*MAX_X+1; x++){
                     fprintf(fp_path, "%lf", SSP[i][z][x][y]);
@@ -1259,58 +1313,4 @@ void MonteCarlo(){
             SaveDataAsCsv();
         }
     }
-}
-
-void Summary(){
-    fp_com = fopen(comfile, "w");
-    if (fp_com == NULL){
-        fprintf(stderr, "%s can not open\n", comfile);
-        exit(1);
-    }
-
-    unsigned long long int sec;
-    int month, day, hour, min;
-
-    sec = (double)(time(NULL) - time_start);
-
-    day = sec / (60*60*24);
-    sec = sec % (60*60*24);
-    hour = sec / (60*60);
-    sec = sec % (60*60);
-    min = sec / 60;
-    sec = sec % 60;
-
-    fprintf(fp_com, "<This file is created by 'montecarlo.c'>\n");
-    fprintf(fp_com, "input photons        %12llu\n", phot_in);
-    fprintf(fp_com, "output photons       %12llu\n", phot_out);
-    fprintf(fp_com, "detect photons       %12llu\n", phot_detected);
-    fprintf(fp_com, "over time photons    %12llu\n", phot_overtime);
-    fprintf(fp_com, "over path photons    %12llu\n", phot_overpath);
-    fprintf(fp_com, "over scatter photons %12llu\n", phot_overscat);
-    fprintf(fp_com, "time taken : %dD, %dH, %dM, %lluS\n\n",day,hour,min,sec);
-
-    fprintf(fp_com, "layer width mus mua\n");
-    for(int i = 0; i < MAX_LAYER; i++){
-        fprintf(fp_com, "%d %d %.4f %.4f\n", i, width[i], mus[i], mua[i]);
-    }
-
-    fprintf(fp_com, "\nphase function:  g = %.1lf\n",g);
-    fprintf(fp_com, "source NA:       %.1f\n", source_NA);
-    fprintf(fp_com, "source radius:   Min = %.1f\tMax = %.1f\n",
-            source_minrad, source_maxrad);
-    fprintf(fp_com, "source:          (x = %.1f, y = %.1f, z = %.1f)\n",
-            source_x, source_y, source_z);
-    fprintf(fp_com, "detector NA:     %.1f\n", detector_NA);
-    fprintf(fp_com, "detector radius: Min = %.1f\tMax = %.1f\n",
-            detector_minrad, detector_maxrad);
-    for(int i = 0; i < MAX_DET; i++){
-        fprintf(fp_com, "detector[%d]:     (x = %.1f, y = %.1f, z = %.1f)\n",
-                i, detector_x[i], detector_y[i], detector_z[i]);
-    }
-
-    if(stop_fg == TRUE){
-        fprintf(fp_com, "\nCOMPLETED");
-    }
-
-    fclose(fp_com);
 }
