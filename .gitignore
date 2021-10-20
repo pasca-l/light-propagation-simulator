@@ -8,5 +8,6 @@
 *.com
 *.txt
 *.csv
+*.png
 
 */venv
