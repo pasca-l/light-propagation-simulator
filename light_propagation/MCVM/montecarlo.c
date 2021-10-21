@@ -17,18 +17,19 @@ written by S.Yamadate[2021]
 #define STRSIZE 50
 typedef char string[STRSIZE];
 
-static FILE *fp_base, *fp_model, *fp_note, *fp_data, *fp_pd, *fp_ssp, *fp_com;
+static FILE *fp_base, *fp_model, *fp_note, *fp_data, *fp_pd, *fp_path, *fp_com;
 static string baseconf = "settings.conf";
 static string modelconf = "model.conf";
 static string note = "../results/temporary_note.txt";
 static string datafile = "../results/binary.data";
 static string pdfile = "../results/binary.pd";
-static string sspfile = "../results/binary.ssp";
+static string pathfile = "../results/binary.ssp";
 static string comfile = "../results/summary.com";
 
-static FILE *fp_int, *fp_path;
+static FILE *fp_int, *fp_ssp, *fp_tssp;
 static string intfile = "../results/intensity.csv";
-static string pathfile = "../results/ssp.csv";
+static string sspfile = "../results/ssp.csv";
+static string tsspfile = "../results/tssp";
 /* ======================================================================== */
 
 /* global variables to be altered ========================================= */
@@ -52,20 +53,20 @@ static string pathfile = "../results/ssp.csv";
 /* ======================================================================== */
 
 /* global variables as constants ========================================== */
-#define VC          0.3  /* speed of light in vacuum (mm/psec) */
+#define VC      0.3  /* speed of light in vacuum (mm/psec) */
 
-#define PI          3.14159265358979324
-#define DEG_RAD     (PI / 180.0)
-#define RAD_DEG     (180.0 / PI)
-#define COSZERO     (1.0 - 1.0E-12)       /* cosine of about 1e-6 rad */
+#define PI      3.14159265358979324
+#define DEG_RAD (PI / 180.0)
+#define RAD_DEG (180.0 / PI)
+#define COSZERO (1.0 - 1.0E-12)       /* cosine of about 1e-6 rad */
 
-#define MIN_RAND    1.77635683940025e-15  /* =2**-49 (min of randnumber) */
+#define MIN_RAND 1.77635683940025e-15  /* =2**-49 (min of randnumber) */
 
-#define TRUE        1
-#define FALSE       0
+#define TRUE  1
+#define FALSE 0
 
-#define N           25
-#define M           7
+#define N 25
+#define M 7
 static unsigned long val[N] = {
     0x95f24dab, 0x0b685215, 0xe76ccae7, 0xaf3ec239, 0x715fad23,
     0x24a590ad, 0x69e4b5ef, 0xbf456141, 0x96bc1b7b, 0xa7bdf825,
@@ -181,7 +182,7 @@ static int scatter_count;
 static void LoadSettings(); /* loads values from settings file */
 static void InitData(); /* initializes variables if file new */
 static void LoadData(); /* loads variables if result partially recorded */
-static void SaveData(); /* saves variables to binary data */
+static void SaveData(); /* saves variables to binary data; fast save */
 static void Summary();
 static void SaveDataAsCsv();
 static void SetSeed();
@@ -194,11 +195,11 @@ static void MonteCarlo();
     static void SourceDirection(); /* photon direction at source */
     static void CheckLayer(double z); /* layer which photon is in */
     static void NewStepSize(); /* new step size */
-    static void NewDirection(); /* new scattered direction */
+    static void NewDirection(); /* new direction by scattering */
     static void RecordVoxelpath(); /* record path at each voxel */
     static void FixPath(); /* fix path length and position */
     static void RecordExit(); /* record property of exited photon */
-    static void CalculateRef();
+    static void CalculateRef(); /* new direction by reflection */
 /* ======================================================================== */
 
 /* dummy variable ========================================================= */
@@ -221,7 +222,6 @@ int main(void){
 
     MonteCarlo();
 
-    Summary();
     SaveDataAsCsv();
 
     exit(0);
@@ -315,8 +315,8 @@ void LoadData(){
         fprintf(stderr, "%s not found or no content\n", pdfile);
         exit(1);
     }
-    if((fp_ssp = fopen(sspfile, "rb")) == NULL){
-        fprintf(stderr, "%s not found or no content\n", sspfile);
+    if((fp_path = fopen(pathfile, "rb")) == NULL){
+        fprintf(stderr, "%s not found or no content\n", pathfile);
         exit(1);
     }
 
@@ -340,14 +340,14 @@ void LoadData(){
     fread(TPD, sizeof(double), MT_PD*MAX_Z*(MAX_X * 2 + 1), fp_pd);
 
     /* values of binary.ssp */
-    fread(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1), fp_ssp);
+    fread(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1), fp_path);
     fread(TSSP, sizeof(double), MAX_DET*MT_SSP*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1),
-          fp_ssp);
+          fp_path);
 
     fclose(fp_note);
     fclose(fp_data);
     fclose(fp_pd);
-    fclose(fp_ssp);
+    fclose(fp_path);
 }
 
 void Summary(){
@@ -418,8 +418,8 @@ void SaveData(){
         fprintf(stderr, "%s can not open\n", pdfile);
         exit(1);
     }
-    if((fp_ssp = fopen(sspfile, "wb")) == NULL){
-        fprintf(stderr, "%s can not open\n", sspfile);
+    if((fp_path = fopen(pathfile, "wb")) == NULL){
+        fprintf(stderr, "%s can not open\n", pathfile);
         exit(1);
     }
 
@@ -456,14 +456,14 @@ void SaveData(){
     fwrite(TPD, sizeof(double), MT_PD*MAX_Z*(MAX_X*2+1), fp_pd);
 
     /* values for binary.ssp */
-    fwrite(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1), fp_ssp);
+    fwrite(SSP, sizeof(double), MAX_DET*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1), fp_path);
     fwrite(TSSP, sizeof(double), MAX_DET*MT_SSP*MAX_Z*(MAX_X*2+1)*(MAX_Y*2+1),
-           fp_ssp);
+           fp_path);
 
     fclose(fp_note);
     fclose(fp_data);
     fclose(fp_pd);
-    fclose(fp_ssp);
+    fclose(fp_path);
 }
 
 void SaveDataAsCsv(){
@@ -488,26 +488,58 @@ void SaveDataAsCsv(){
     fclose(fp_int);
 
     /* partial path length */
-    if((fp_path = fopen(pathfile, "w")) == NULL){
-        fprintf(stderr, "%s can not open\n", pathfile);
+    if((fp_ssp = fopen(sspfile, "w")) == NULL){
+        fprintf(stderr, "%s can not open\n", sspfile);
         exit(1);
     }
 
     for(int i = 0; i < MAX_DET; i++){
-        fprintf(fp_path, "Record of %d depths\n", MAX_Z);
+        fprintf(fp_ssp, "Detector[%d],%d depths\n", i, MAX_Z);
         for(int z = 0; z < MAX_Z; z++){
             for(int y = 0; y < 2*MAX_Y+1; y++){
                 for(int x = 0; x < 2*MAX_X+1; x++){
-                    fprintf(fp_path, "%lf", SSP[i][z][x][y]);
+                    fprintf(fp_ssp, "%lf", SSP[i][z][x][y]);
                     if(x != 2*MAX_X){
-                        fprintf(fp_path, ",");
+                        fprintf(fp_ssp, ",");
                     }
                 }
-                fprintf(fp_path, "\n");
+                fprintf(fp_ssp, "\n");
             }
         }
     }
-    fclose(fp_path);
+    fclose(fp_ssp);
+
+    /* time-resolved partial path length */
+    for(int t = 0; t < MT_SSP; t++){
+        string filename, count;
+
+        sprintf(count, "%d", t);
+        strcpy(filename, tsspfile);
+        strcat(filename, count);
+        strcat(filename, ".csv");
+
+        if((fp_tssp = fopen(filename, "w")) == NULL){
+            fprintf(stderr, "%s can not open\n", tsspfile);
+            exit(1);
+        }
+
+        fprintf(fp_tssp, "Between %d - %d ps\n", t * DT_SSP, (t + 1) * DT_SSP);
+        for(int i = 0; i < MAX_DET; i++){
+            fprintf(fp_tssp, "Detector[%d],%d depths\n", i, MAX_Z);
+            for(int z = 0; z < MAX_Z; z++){
+                for(int y = 0; y < 2*MAX_Y+1; y++){
+                    for(int x = 0; x < 2*MAX_X+1; x++){
+                        fprintf(fp_tssp, "%lf", TSSP[i][t][z][x][y]);
+                        if(x != 2*MAX_X){
+                            fprintf(fp_tssp, ",");
+                        }
+                    }
+                    fprintf(fp_tssp, "\n");
+                }
+            }
+        }
+        fclose(fp_tssp);
+    }
 }
 
 void SetSeed(){
@@ -1095,11 +1127,11 @@ void FixPath(){
 
 void RecordExit(){
     int x, y, z;
-    long t, tssp;
+    long t, ssp_t;
     double theta, d1, d2;
 
     t = (long) fabs((totalpath * REF_IND * SCALE / VC) / DT);
-    tssp = (long) fabs((totalpath * REF_IND * SCALE / VC) / DT_SSP);
+    ssp_t = (long) fabs((totalpath * REF_IND * SCALE / VC) / DT_SSP);
 
     for(int i = 0; i < MAX_DET; i++){
         theta = acos(detector_dx[i] * dx +
@@ -1131,13 +1163,13 @@ void RecordExit(){
                    }
                }
 
-               if(tssp >= 0 && tssp < MT_SSP){
-                   intensity_for_ssp[i][tssp] += eweight;
+               if(ssp_t >= 0 && ssp_t < MT_SSP){
+                   intensity_for_ssp[i][ssp_t] += eweight;
                    for(z = 0; z < MAX_Z; z++){
                        for(x = 0; x < 2 * MAX_X; x++){
                            for(y = 0; y <= 2 * MAX_Y; y++){
                                temp = eweight * path_for_ssp[z][x][y] * SCALE;
-                               TSSP[i][tssp][z][x][y] += temp;
+                               TSSP[i][ssp_t][z][x][y] += temp;
                            }
                        }
                    }
