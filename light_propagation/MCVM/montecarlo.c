@@ -1,9 +1,19 @@
 /*
 
 Monte Carlo Program for voxel model
-Only records spatial intensity and partial path length at given depth
 
-written by S.Yamadate[2021]
+Calculates intensity and partial path length with given settings and model
+
+    Final output is csv file of intensity, ssp, time-resolved ssp,
+    but saves binary file of calculation each percent of progress,
+    which is added under "../results" relative to the execution file
+    (this directory would not generate automatically unlike other data files)
+
+    Settings in settings.conf, model.conf needs to be in the same order,
+    however detector and model layer may be added
+
+    Calculation can be resumed from a point of interruption,
+    under condition of settings.conf -> is_newfile == 'n'
 
 */
 
@@ -18,18 +28,18 @@ written by S.Yamadate[2021]
 typedef char string[STRSIZE];
 
 static FILE *fp_base, *fp_model, *fp_note, *fp_data, *fp_pd, *fp_path, *fp_com;
-static string baseconf = "settings.conf";
+static string baseconf  = "settings.conf";
 static string modelconf = "model.conf";
-static string note = "../results/temporary_note.txt";
-static string datafile = "../results/binary.data";
-static string pdfile = "../results/binary.pd";
-static string pathfile = "../results/binary.ssp";
-static string comfile = "../results/summary.com";
+static string note      = "../results/temporary_note.txt";
+static string datafile  = "../results/binary.data";
+static string pdfile    = "../results/binary.pd";
+static string pathfile  = "../results/binary.ssp";
+static string comfile   = "../results/summary.com";
 
 static FILE *fp_int, *fp_ssp, *fp_tssp;
-static string intfile = "../results/intensity.csv";
-static string sspfile = "../results/ssp.csv";
-static string tsspfile = "../results/tssp";
+static string intfile   = "../results/intensity.csv";
+static string sspfile   = "../results/ssp.csv";
+static string tsspfile  = "../results/tssp";
 /* ======================================================================== */
 
 /* global variables to be altered ========================================= */
@@ -379,7 +389,7 @@ void Summary(){
         fprintf(fp_com, "%d %d %.4f %.4f\n", i, width[i], mus[i], mua[i]);
     }
 
-    fprintf(fp_com, "\nphase function:  g = %.1lf\n",g);
+    fprintf(fp_com, "\nphase function:  g = %.1lf\n", g);
     fprintf(fp_com, "source NA:       %.1f\n", source_NA);
     fprintf(fp_com, "source radius:   Min = %.1f\tMax = %.1f\n",
             source_minrad, source_maxrad);

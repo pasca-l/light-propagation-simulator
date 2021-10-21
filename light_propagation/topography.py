@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-def main():
+def topography_of_ssp():
     ssp = np.loadtxt("./results/ssp.csv", skiprows=1, delimiter=',')
     # reshape to (depth, rows, columns)
     ssp = np.reshape(ssp, (38, 61, 61))
@@ -22,6 +22,10 @@ def main():
 
         plt.clf()
         plt.close()
+
+
+def main():
+    topography_of_ssp()
 
 
 if __name__ == '__main__':
