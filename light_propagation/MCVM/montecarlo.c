@@ -202,10 +202,6 @@ static void MonteCarlo();
     static void CalculateRef(); /* new direction by reflection */
 /* ======================================================================== */
 
-/* dummy variable ========================================================= */
-double temp;
-/* ======================================================================== */
-
 
 int main(void){
     LoadSettings();
@@ -717,7 +713,7 @@ void SourcePosition(){
 
 void SourceDirection(){
     long r1, r2;
-    double norm;
+    double norm, temp;
 
     r1 = (long) GenRand() * (TABLEN - 1);
     r2 = (long) GenRand() * (TABLEN - 1);
@@ -785,7 +781,7 @@ void NewStepSize(){
 }
 
 void NewDirection(){
-    double dr1, dr2, dr3;
+    double dr1, dr2, dr3, temp;
     long r1, r2;
 
     r1 = (long) (GenRand() * ((double) TABLEN - 1));
@@ -826,7 +822,7 @@ void NewDirection(){
 void RecordVoxelpath(){
     int fg = 0;
     double lx, ly, lz;
-    double xtemp, ytemp, ztemp, ltemp;
+    double temp, xtemp, ytemp, ztemp, ltemp;
 
     temp = step;
     xtemp = xold;
@@ -1110,6 +1106,8 @@ void RecordVoxelpath(){
 }
 
 void FixPath(){
+    double temp;
+
     temp = sqrt((xnew - cross_x) * (xnew - cross_x) +
                 (ynew - cross_y) * (ynew - cross_y) +
                 (znew - cross_z) * (znew - cross_z));
@@ -1128,7 +1126,7 @@ void FixPath(){
 void RecordExit(){
     int x, y, z;
     long t, ssp_t;
-    double theta, d1, d2;
+    double theta, d1, d2, temp;
 
     t = (long) fabs((totalpath * REF_IND * SCALE / VC) / DT);
     ssp_t = (long) fabs((totalpath * REF_IND * SCALE / VC) / DT_SSP);
@@ -1183,7 +1181,7 @@ void RecordExit(){
 }
 
 void CalculateRef(){
-    double n1, n2, n3, ref;
+    double n1, n2, n3, ref, temp;
 
     if(refx_fg == 1 && refy_fg == 0 && refz_fg == 0){
         n1 = -1 * dx / fabs(dx);
