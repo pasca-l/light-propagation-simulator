@@ -36,8 +36,9 @@ static string pdfile    = "../results/binary.pd";
 static string pathfile  = "../results/binary.ssp";
 static string comfile   = "../results/summary.com";
 
-static FILE *fp_int, *fp_ssp, *fp_tssp;
+static FILE *fp_int, *fp_pathl, *fp_ssp, *fp_tssp;
 static string intfile   = "../results/intensity.csv";
+static string pathlfile = "../results/layer_path.csv";
 static string sspfile   = "../results/ssp.csv";
 static string tsspfile  = "../results/tssp_map/tssp";
 /* ======================================================================== */
@@ -492,6 +493,23 @@ void SaveDataAsCsv(){
         fprintf(fp_int, "\n");
     }
     fclose(fp_int);
+
+    /* path length per layer */
+    /* used for low number of photon input to check trend */
+    /*
+    if((fp_pathl = fopen(pathlfile, "w")) == NULL){
+        fprintf(stderr, "%s can not open\n", pathlfile);
+        exit(1);
+    }
+
+    fprintf(fp_pathl, "layer,path length\n");
+    for(int i = 0; i < MAX_DET; i++){
+        for(int j = 0; j < MAX_LAYER; j++){
+            fprintf(fp_pathl, "%d,%lf\n", j, PPATH[i][j]);
+        }
+    }
+    fclose(fp_pathl);
+    */
 
     /* partial path length */
     if((fp_ssp = fopen(sspfile, "w")) == NULL){

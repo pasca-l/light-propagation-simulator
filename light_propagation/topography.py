@@ -62,7 +62,7 @@ def topography_of_dod(total_depth=28, mua_depth_init=0, mua_depth=1):
 
     ssp_with_buffer = np.zeros((2*inputx-1, 2*inputy-1))
     xcenter, ycenter = map(lambda f: int(f/2), ssp_with_buffer.shape)
-    for z in range(mua_depth_init, mua_depth):
+    for z in range(mua_depth_init, mua_depth_init + mua_depth):
         ssp_with_buffer += add_surrounding_zeros(ssp[z])
 
     dmua_map = create_dmua_map(ssp_with_buffer)
@@ -97,7 +97,7 @@ def topography_of_dod(total_depth=28, mua_depth_init=0, mua_depth=1):
 
 
 def main():
-    topography_of_dod()
+    topography_of_dod(mua_depth_init=14)
 
 
 if __name__ == '__main__':
