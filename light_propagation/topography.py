@@ -79,7 +79,7 @@ def topography_of_dod(total_depth=28, mua_depth_init=0, mua_depth=1):
             np.savetxt(f'./results/dmua_map/dmua({i},{j}).csv',
                      relative_dmua_map[29:90,29:90], delimiter=',', fmt='%lf')
 
-    np.savetxt('./dOD.csv', dod_map, delimiter=',', fmt='%lf')
+    np.savetxt('./results/dOD.csv', dod_map, delimiter=',', fmt='%lf')
 
     image = np.zeros_like(dod_map)
     if dod_map.max() != 0:
