@@ -39,7 +39,7 @@ static string comfile   = "../results/summary.com";
 static FILE *fp_int, *fp_ssp, *fp_tssp;
 static string intfile   = "../results/intensity.csv";
 static string sspfile   = "../results/ssp.csv";
-static string tsspfile  = "../results/tssp";
+static string tsspfile  = "../results/tssp_map/tssp";
 /* ======================================================================== */
 
 /* global variables to be altered ========================================= */
@@ -521,8 +521,9 @@ void SaveDataAsCsv(){
 
         sprintf(count, "%d", t);
         strcpy(filename, tsspfile);
+        strcat(filename, "(gate=");
         strcat(filename, count);
-        strcat(filename, ".csv");
+        strcat(filename, ").csv");
 
         if((fp_tssp = fopen(filename, "w")) == NULL){
             fprintf(stderr, "%s can not open\n", tsspfile);
