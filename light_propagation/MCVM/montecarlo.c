@@ -131,6 +131,7 @@ static unsigned long long int phot_detected;  /* detected photons */
 static unsigned long long int phot_overtime;  /* over-time photons */
 static unsigned long long int phot_overpath;  /* over-path photons */
 static unsigned long long int phot_overscat;  /* over-scattering photons */
+static unsigned long long int time_taken = 0; /* time taken */
 
 static double PD[MAX_Z][MAX_X*2+1];
 static double TPD[MT_PD][MAX_Z][MAX_X*2+1];
@@ -334,6 +335,7 @@ void LoadData(){
     fscanf(fp_note, "%llu%*[^\n]%*c", &phot_overtime);
     fscanf(fp_note, "%llu%*[^\n]%*c", &phot_overpath);
     fscanf(fp_note, "%llu%*[^\n]%*c", &phot_overscat);
+    fscanf(fp_note, "%llu%*[^\n]%*c", &time_taken);
     phot_start = phot_in;
 
     /* values of binary.data */
@@ -367,7 +369,7 @@ void Summary(){
     unsigned long long int sec;
     int month, day, hour, min;
 
-    sec = (double)(time(NULL) - time_start);
+    sec = (double)(time(NULL) - time_start) + time_taken;
 
     day = sec / (60*60*24);
     sec = sec % (60*60*24);
@@ -431,12 +433,14 @@ void SaveData(){
     }
 
     /* values for temporary_note.txt */
+    time_taken = (double)(time(NULL) - time_start) + time_taken;
     fprintf(fp_note, "%12llu\n", phot_in);
     fprintf(fp_note, "%12llu\n", phot_out);
     fprintf(fp_note, "%12llu\n", phot_detected);
     fprintf(fp_note, "%12llu\n", phot_overtime);
     fprintf(fp_note, "%12llu\n", phot_overpath);
     fprintf(fp_note, "%12llu\n", phot_overscat);
+    fprintf(fp_note, "%12llu\n", time_taken);
 
     /* values for binary.data */
     fwrite(PPATH, sizeof(double), MAX_DET*MAX_LAYER, fp_data);
@@ -1253,8 +1257,8 @@ void MonteCarlo(){
     long t, time_max;
     double pd;
 
-    time_max = MT * DT;
     time_start = time(NULL);
+    time_max = MT * DT;
     stop_fg = FALSE;
 
     while(phot_in < phot_input && stop_fg == FALSE){
