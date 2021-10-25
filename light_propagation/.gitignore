@@ -3,12 +3,11 @@
 *.ssp
 *.com
 *.txt
-*.csv
-*.png
 
+/results/*.csv
+/results/*.png
 /results/dmua_map/*.csv
 /results/ssp_topography/*.png
-
-!/results/tssp_map/
+/results/tssp_map/*.png
 
 /venv/
