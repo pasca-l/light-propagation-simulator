@@ -1,2 +1,12 @@
 .DS_Store
 */.DS_Store
+
+*.data
+*.pd
+*.ssp
+*.com
+*.txt
+*.csv
+*.png
+
+*/venv/
