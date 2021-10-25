@@ -11,3 +11,5 @@
 *.png
 
 */venv
+
+!/light_propagation/results/
