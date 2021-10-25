@@ -1,0 +1,11 @@
+/results/*.data
+/results/*.pd
+/results/*.ssp
+/results/*.com
+/results/*.txt
+/results/*.csv
+/results/*.png
+
+!/results/tssp_map/
+
+*/venv

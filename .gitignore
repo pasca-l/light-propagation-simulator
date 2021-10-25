@@ -1,15 +1,2 @@
 .DS_Store
 */.DS_Store
-
-*.out
-*.data
-*.pd
-*.ssp
-*.com
-*.txt
-*.csv
-*.png
-
-*/venv
-
-!light_propagation/results/
