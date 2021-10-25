@@ -8,6 +8,6 @@
 /results/*.png
 /results/dmua_map/*.csv
 /results/ssp_topography/*.png
-/results/tssp_map/*.png
+/results/tssp_map/*.csv
 
 /venv/
