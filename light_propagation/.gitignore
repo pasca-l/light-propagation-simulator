@@ -1,11 +1,14 @@
-/results/*.data
-/results/*.pd
-/results/*.ssp
-/results/*.com
-/results/*.txt
-/results/*.csv
-/results/*.png
+*.data
+*.pd
+*.ssp
+*.com
+*.txt
+*.csv
+*.png
+
+/results/dmua_map/*.csv
+/results/ssp_topography/*.png
 
 !/results/tssp_map/
 
-*/venv
+/venv/
