@@ -433,14 +433,16 @@ void SaveData(){
     }
 
     /* values for temporary_note.txt */
-    time_taken = (double)(time(NULL) - time_start) + time_taken;
+    unsigned long long int sec;
+    sec = (double)(time(NULL) - time_start) + time_taken;
+
     fprintf(fp_note, "%12llu\n", phot_in);
     fprintf(fp_note, "%12llu\n", phot_out);
     fprintf(fp_note, "%12llu\n", phot_detected);
     fprintf(fp_note, "%12llu\n", phot_overtime);
     fprintf(fp_note, "%12llu\n", phot_overpath);
     fprintf(fp_note, "%12llu\n", phot_overscat);
-    fprintf(fp_note, "%12llu\n", time_taken);
+    fprintf(fp_note, "%12llu\n", sec);
 
     /* values for binary.data */
     fwrite(PPATH, sizeof(double), MAX_DET*MAX_LAYER, fp_data);
