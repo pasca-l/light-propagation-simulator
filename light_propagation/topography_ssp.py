@@ -3,9 +3,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class SspTopography:
-    def __init__(self):
-        self.dir_name = "1Br2.6" # directory to work in, under results/
-        self.work_dir = f"./results/{self.dir_name}/"
+    def __init__(self, dirname):
+        self.work_dir = f"./results/{dirname}/"
+
+        self.inputx = 61
+        self.inputy = 61
+        self.total_depth = 28
+        self.gate = 16
 
         # make folder to save topography images
         self.ssp_topo_dir = self.work_dir + "ssp_topography/"
@@ -31,30 +35,31 @@ class SspTopography:
         plt.clf()
         plt.close()
 
-    def topography_of_ssp(self, total_depth=28):
+    def topography_of_ssp(self):
         ssp_map = self.work_dir + "ssp.csv"
         ssp = np.loadtxt(ssp_map, skiprows=1, delimiter=',')
         # reshape to (depth, rows, columns)
-        ssp = np.reshape(ssp, (total_depth, 61, 61))
+        ssp = np.reshape(ssp, (self.total_depth, self.inputx, self.inputy))
 
-        for z in range(total_depth):
+        for z in range(self.total_depth):
             self.make_topography(z, ssp,
                                  self.ssp_topo_dir + f"ssp(z={z}).png")
 
-    def topography_of_tssp(self, total_depth=28, gate=16):
-        for gatenum in range(gate):
+    def topography_of_tssp(self):
+        for gatenum in range(self.gate):
             tssp_map = self.work_dir + f"tssp_map/tssp(gate={gatenum}).csv"
             tssp = np.loadtxt(tssp_map, skiprows=2, delimiter=',')
-            tssp = np.reshape(tssp, (total_depth, 61, 61))
+            tssp = np.reshape(tssp,
+                              (self.total_depth, self.inputx, self.inputy))
 
-            for z in range(total_depth):
+            for z in range(self.total_depth):
                 self.make_topography(z, tssp,
                                      self.tssp_topo_dir +
                                      f"tssp(gate={gatenum},z={z}).png")
 
 
 def main():
-    topo = SspTopography()
+    topo = SspTopography("10^9(r=2.6)")
     topo.topography_of_ssp()
 
 

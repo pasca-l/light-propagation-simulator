@@ -3,27 +3,25 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class DodTopography:
-    def __init__(self):
-        self.dir_name = "test" # directory to work in, under results/
-        self.work_dir = f"./results/{self.dir_name}/"
+    def __init__(self, dirname):
+        self.work_dir = f"./results/{dirname}/"
         self.dmua_map_check = False
 
         self.inputx = 61
         self.inputy = 61
         self.total_depth = 28
-        self.mua_depth_init = 14
-        self.mua_depth = 1
+        self.dmua_depth_init = 14
+        self.dmua_depth = 1
         self.dmua = 0.002
+        self.dmua_r = 3
 
-        self.ssp_map = np.loadtxt(self.work_dir + "ssp.csv",
-                                  skiprows=1, delimiter=',')
+        # self.ssp_map = np.loadtxt(self.work_dir + "ssp.csv",
+        #                           skiprows=1, delimiter=',')
+        self.ssp_map = np.loadtxt(self.work_dir + "tssp_map/tssp(gate=15).csv",
+                                  skiprows=2, delimiter=',')
         self.ssp = np.reshape(self.ssp_map,
                               (self.total_depth, self.inputx, self.inputy))
 
-        # create directory as below
-        # _ work_dir
-        # |_ dOD
-        #  |_ dmua_map
         self.dod_dir = self.work_dir + "dOD/"
         if not os.path.exists(self.dod_dir):
             os.makedirs(self.dod_dir)
@@ -46,7 +44,8 @@ class DodTopography:
 
         return output
 
-    def create_dmua_map(self, ssp_map, r=3):
+    def create_dmua_map(self, ssp_map):
+        r = self.dmua_r
         dmua_map = np.zeros_like(ssp_map)
         ymid, xmid = map(lambda f: int(f/2), dmua_map.shape)
 
@@ -101,8 +100,8 @@ class DodTopography:
 
     def topography_of_dod(self):
         ssp_with_buffer = np.zeros((2*self.inputx-1, 2*self.inputy-1))
-        for z in range(self.mua_depth_init,
-                       self.mua_depth_init + self.mua_depth):
+        for z in range(self.dmua_depth_init,
+                       self.dmua_depth_init + self.dmua_depth):
             ssp_with_buffer += self.add_surrounding_zeros(self.ssp[z])
 
         dmua_map = self.create_dmua_map(ssp_with_buffer)
@@ -115,8 +114,8 @@ class DodTopography:
 
     def topography_of_psf(self):
         psf_map = np.zeros((self.inputx, self.inputy))
-        for z in range(self.mua_depth_init,
-                       self.mua_depth_init + self.mua_depth):
+        for z in range(self.dmua_depth_init,
+                       self.dmua_depth_init + self.dmua_depth):
             psf_map += self.ssp[z]
 
         psf_mua_map = np.empty_like(psf_map)
@@ -128,7 +127,7 @@ class DodTopography:
 
 
 def main():
-    topo = DodTopography()
+    topo = DodTopography("10^9(r=2.6)")
     topo.topography_of_dod()
     topo.topography_of_psf()
 
