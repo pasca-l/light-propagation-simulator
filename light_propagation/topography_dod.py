@@ -88,11 +88,14 @@ class DodTopography:
         if dod_map.max() != 0:
             image = dod_map / dod_map.max()
 
+        # save image without axis and legend
+        plt.imsave(save_name[:-4] + "_img.png", image, cmap='hot')
+
+        # save image with axis and legend
         fig = plt.figure()
         plt.imshow(image, cmap='hot')
         plt.colorbar()
         plt.clim(0, 1)
-
         fig.savefig(save_name)
 
         plt.clf()
@@ -127,7 +130,7 @@ class DodTopography:
 
 
 def main():
-    topo = DodTopography("10^9(r=2.6)")
+    topo = DodTopography("10^9(r=0.5)")
     topo.topography_of_dod()
     topo.topography_of_psf()
 
