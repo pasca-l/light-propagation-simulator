@@ -9,12 +9,6 @@ class Fitter:
                                   delimiter=',')
 
         self.size_x, self.size_y = self.dod_map.shape
-        self.xval, self.yval = np.meshgrid(
-                                np.linspace(0, self.size_x - 1, self.size_x),
-                                np.linspace(0, self.size_y - 1, self.size_y))
-
-        # gaussian function parameters: cen_x, cen_y, sig_x, sig_y, amp
-        self.initial_guess = (30, 30, 10, 10, 0.01)
 
     def twoD_gaussian(self, coord, cen_x, cen_y, sig_x, sig_y, amp):
         x, y = coord
@@ -24,13 +18,16 @@ class Fitter:
         return function.ravel()
 
     def find_nearest_gaussian(self):
-        popt, _ = opt.curve_fit(self.twoD_gaussian,
-                                (self.xval, self.yval),
-                                self.dod_map.ravel(),
-                                p0=self.initial_guess)
+        xval, yval = np.meshgrid(np.linspace(0, self.size_x - 1, self.size_x),
+                                 np.linspace(0, self.size_y - 1, self.size_y))
+
+        # gaussian function parameters: cen_x, cen_y, sig_x, sig_y, amp
+        initial_guess = (30, 30, 10, 10, 0.01)
+        popt, _ = opt.curve_fit(self.twoD_gaussian, (xval, yval),
+                                self.dod_map.ravel(), p0=initial_guess)
 
         print(popt)
-        best_fit = self.twoD_gaussian((self.xval, self.yval), *popt)
+        best_fit = self.twoD_gaussian((xval, yval), *popt)
         best_fit = best_fit.reshape(self.size_x, self.size_y)
         if best_fit.max() != 1:
             best_fit = best_fit / best_fit.max()
