@@ -1,11 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-def gaussian_heatmap(center=(29,29), image_size=(61,61), sig=12):
-    x_axis = np.linspace(0, image_size[0]-1, image_size[0]) - center[0]
-    y_axis = np.linspace(0, image_size[1]-1, image_size[1]) - center[1]
-    xx, yy = np.meshgrid(x_axis, y_axis)
-    kernel = np.exp(-0.5 * (np.square(xx) + np.square(yy)) / np.square(sig))
+def single_sig_gaussian(center=(29,29), size=(61,61), sig=12):
+    x_axis = np.linspace(0, size[0]-1, size[0]) - center[0]
+    y_axis = np.linspace(0, size[1]-1, size[1]) - center[1]
+    xval, yval = np.meshgrid(x_axis, y_axis)
+    xxval, yyval = np.square(xval), np.square(yval)
+    kernel = np.exp(-0.5 * (xxval + yyval) / np.square(sig))
 
     return kernel
 
