@@ -14,10 +14,12 @@ class DodTopography:
         self.dmua_depth = 1
         self.dmua = 0.002
         self.dmua_r = 3
+        self.gate = 15
 
         # self.ssp_map = np.loadtxt(self.work_dir + "ssp.csv",
         #                           skiprows=1, delimiter=',')
-        self.ssp_map = np.loadtxt(self.work_dir + "tssp_map/tssp(gate=15).csv",
+        self.ssp_map = np.loadtxt(self.work_dir +
+                                  f"tssp_map/tssp(gate={self.gate}).csv",
                                   skiprows=2, delimiter=',')
         self.ssp = np.reshape(self.ssp_map,
                               (self.total_depth, self.inputx, self.inputy))
@@ -85,7 +87,7 @@ class DodTopography:
 
     def make_topography(self, dod_map, save_name):
         image = np.zeros_like(dod_map)
-        if dod_map.max() != 0:
+        if dod_map.max() != 1:
             image = dod_map / dod_map.max()
 
         # save image without axis and legend
@@ -112,7 +114,8 @@ class DodTopography:
 
         dod_map = self.convolute_maps(dod_map, dmua_map, ssp_with_buffer)
 
-        np.savetxt(self.dod_dir + "dOD.csv", dod_map, delimiter=',', fmt='%lf')
+        np.savetxt(self.dod_dir + "dOD.csv",
+                   dod_map, delimiter=',', fmt='%lf')
         self.make_topography(dod_map, self.dod_dir + "dOD.png")
 
     def topography_of_psf(self):

@@ -1,7 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-def main():
+def gaussian_heatmap(center=(29,29), image_size=(61,61), sig=12):
+    x_axis = np.linspace(0, image_size[0]-1, image_size[0]) - center[0]
+    y_axis = np.linspace(0, image_size[1]-1, image_size[1]) - center[1]
+    xx, yy = np.meshgrid(x_axis, y_axis)
+    kernel = np.exp(-0.5 * (np.square(xx) + np.square(yy)) / np.square(sig))
+
+    return kernel
+
+
+def topography_of_deconv():
     dirname = "10^9(r=2.6)"
     work_dir = f"./results/{dirname}/"
 
@@ -14,7 +23,7 @@ def main():
     deconv = f_dod_map / f_psf_map
     if_dod_map = np.fft.ifft2(deconv).real
 
-    if if_dod_map.max() != 0:
+    if if_dod_map.max() != 1:
         if_dod_map = if_dod_map / if_dod_map.max()
 
     fig = plt.figure()
@@ -25,6 +34,10 @@ def main():
 
     plt.clf()
     plt.close()
+
+
+def main():
+    topography_of_deconv()
 
 
 if __name__ == '__main__':
