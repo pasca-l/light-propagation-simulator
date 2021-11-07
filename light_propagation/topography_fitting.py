@@ -26,7 +26,12 @@ class Fitter:
         popt, _ = opt.curve_fit(self.twoD_gaussian, (xval, yval),
                                 self.dod_map.ravel(), p0=initial_guess)
 
-        print(popt)
+        print(f"centroid_x : {popt[0]},")
+        print(f"centroid_y : {popt[1]},")
+        print(f"sigma_x : {popt[2]},")
+        print(f"sigma_y : {popt[3]},")
+        print(f"amplitude : {popt[4]}")
+
         best_fit = self.twoD_gaussian((xval, yval), *popt)
         best_fit = best_fit.reshape(self.size_x, self.size_y)
         if best_fit.max() != 1:
@@ -36,12 +41,10 @@ class Fitter:
         plt.imshow(best_fit, cmap='hot')
         plt.colorbar()
         plt.clim(0, 1)
-        fig.savefig(self.work_dir + "dOD/fit.png")
+        fig.savefig(self.work_dir + "dOD/best_fit.png")
 
         plt.clf()
         plt.close()
-
-        return
 
 
 def main():
