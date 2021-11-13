@@ -30,17 +30,17 @@ typedef char string[STRSIZE];
 static FILE *fp_base, *fp_model, *fp_note, *fp_data, *fp_pd, *fp_path, *fp_com;
 static string baseconf  = "settings.conf";
 static string modelconf = "model.conf";
-static string note      = "../results/temporary_note.txt";
-static string datafile  = "../results/binary.data";
-static string pdfile    = "../results/binary.pd";
-static string pathfile  = "../results/binary.ssp";
-static string comfile   = "../results/summary.com";
+static string note      = "../data/temporary_note.txt";
+static string datafile  = "../data/binary.data";
+static string pdfile    = "../data/binary.pd";
+static string pathfile  = "../data/binary.ssp";
+static string comfile   = "../data/summary.com";
 
 static FILE *fp_int, *fp_pathl, *fp_ssp, *fp_tssp;
-static string intfile   = "../results/intensity.csv";
-static string pathlfile = "../results/layer_path.csv";
-static string sspfile   = "../results/ssp.csv";
-static string tsspfile  = "../results/tssp_map/tssp";
+static string intfile   = "../data/intensity.csv";
+static string pathlfile = "../data/layer_path.csv";
+static string sspfile   = "../data/ssp.csv";
+static string tsspfile  = "../data/tssp_map/tssp";
 /* ======================================================================== */
 
 /* global variables to be altered ========================================= */
