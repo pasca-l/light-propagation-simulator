@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python mkdir_data.py
-gcc -lm montecarlo.c
+python3 mkdir_data.py
+gcc -lm -std=c99 montecarlo.c
 ./a.out
-python push_data.py $1
+python3 push_data.py $1
