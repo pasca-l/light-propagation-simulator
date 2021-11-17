@@ -17,7 +17,7 @@ class Fitter:
 
         return function.ravel()
 
-    def find_nearest_gaussian(self):
+    def draw_nearest_gaussian(self):
         xval, yval = np.meshgrid(np.linspace(0, self.size_x - 1, self.size_x),
                                  np.linspace(0, self.size_y - 1, self.size_y))
 
@@ -49,7 +49,7 @@ class Fitter:
 
 def main():
     fitter = Fitter("10^9(r=2.6)")
-    fitter.find_nearest_gaussian()
+    fitter.draw_nearest_gaussian()
 
 
 if __name__ == '__main__':

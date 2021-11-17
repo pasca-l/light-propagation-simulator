@@ -59,8 +59,7 @@ class SspTopography:
 
 
 def main():
-    topo = SspTopography("10^9(r=0.5)")
-    topo.topography_of_ssp()
+    topo = SspTopography("10^9(sr=30,dr=0.5)")
     topo.topography_of_tssp()
 
 
