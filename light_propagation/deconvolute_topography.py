@@ -1,3 +1,4 @@
+import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -38,7 +39,7 @@ class DeconvTopography:
 
 
 def main():
-    deconv = DeconvTopography("10^9(r=2.6)")
+    deconv = DeconvTopography(sys.argv[1])
     topography_of_deconv()
 
 

@@ -1,3 +1,4 @@
+import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.optimize as opt
@@ -48,7 +49,7 @@ class Fitter:
 
 
 def main():
-    fitter = Fitter("10^9(r=2.6)")
+    fitter = Fitter(sys.argv[1])
     fitter.find_nearest_gaussian_param()
 
 

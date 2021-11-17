@@ -1,4 +1,5 @@
 import os
+import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -133,7 +134,7 @@ class DodTopography:
 
 
 def main():
-    topo = DodTopography("10^9(r=0.5)")
+    topo = DodTopography(sys.argv[1])
     topo.topography_of_dod()
     topo.topography_of_psf()
 
