@@ -13,7 +13,7 @@ class Fitter:
         self.gate = 16
 
         with open(self.work_dir + "tssp_fit.csv", 'w') as f:
-            f.write("gate,z,centroid_x,centroid_y,sigma_x,sigma_y,amplitude\n")
+            f.write("gate,z,sigma_x,sigma_y,centroid_x,centroid_y,amplitude\n")
 
     def twoD_gaussian(self, coord, cen_x, cen_y, sig_x, sig_y, amp):
         x, y = coord
@@ -44,8 +44,8 @@ class Fitter:
                     continue
 
                 with open(self.work_dir + "tssp_fit.csv", 'a') as f:
-                    f.write(f"{gatenum},{z},{popt[0]},{popt[1]},")
-                    f.write(f"{popt[2]},{popt[3]},{popt[4]}\n")
+                    f.write(f"{gatenum},{z},{popt[2]},{popt[3]},")
+                    f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
 
 
 def main():
