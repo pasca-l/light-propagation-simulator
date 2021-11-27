@@ -12,10 +12,11 @@ class DodTopography:
         self.inputy = 61
         self.total_depth = 28
         self.dmua_depth_init = 14
-        self.dmua_depth = 1
+        self.dmua_depth = 4
         self.dmua = 0.002
-        self.dmua_r = 3
+        self.dmua_r = 1
         self.gate = 15
+        self.pixel_size = 1
 
         # self.ssp_map = np.loadtxt(self.work_dir + "ssp.csv",
         #                           skiprows=1, delimiter=',')
@@ -86,6 +87,10 @@ class DodTopography:
 
         return dod_map
 
+    def replace_to_representative(self):
+        # 注目画素を一定間隔でとり，それを代表値として周りのn画素をその値に置き換え
+        return
+
     def make_topography(self, dod_map, save_name):
         image = np.zeros_like(dod_map)
         if dod_map.max() != 1:
@@ -115,9 +120,11 @@ class DodTopography:
 
         dod_map = self.convolute_maps(dod_map, dmua_map, ssp_with_buffer)
 
-        np.savetxt(self.dod_dir + "dOD.csv",
-                   dod_map, delimiter=',', fmt='%lf')
-        self.make_topography(dod_map, self.dod_dir + "dOD.png")
+        save_as = self.dod_dir +\
+                  f"dOD(z={self.dmua_depth_init}+{self.dmua_depth - 1}," +\
+                  f"dmuar={self.dmua_r},pixel={self.pixel_size})"
+        np.savetxt(save_as + ".csv", dod_map, delimiter=',', fmt='%lf')
+        self.make_topography(dod_map, save_as + ".png")
 
     def topography_of_psf(self):
         psf_map = np.zeros((self.inputx, self.inputy))
@@ -129,8 +136,10 @@ class DodTopography:
         psf_mua_map.fill(self.dmua)
         psf_map = psf_map * psf_mua_map
 
-        np.savetxt(self.dod_dir + "PSF.csv", psf_map, delimiter=',', fmt='%lf')
-        self.make_topography(psf_map, self.dod_dir + "PSF.png")
+        save_as = self.dod_dir +\
+                  f"PSF(z={self.dmua_depth_init}+{self.dmua_depth - 1})"
+        np.savetxt(save_as + ".csv", psf_map, delimiter=',', fmt='%lf')
+        self.make_topography(psf_map, save_as + ".png")
 
 
 def main():
