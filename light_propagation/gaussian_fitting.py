@@ -16,7 +16,7 @@ class Fitter:
         self.dmua_depth_init = 14
         self.dmua_depth = 4
         self.dmua_r_min = 1
-        self.dmua_r_max = 5
+        self.dmua_r_max = 15
         self.pixel_min = 1
         self.pixel_max = 1
 
@@ -45,7 +45,8 @@ class Fitter:
 
     def tssp_gparam(self):
         with open(self.work_dir + "tssp_fit.csv", 'w') as f:
-            f.write("gate,z,sigma_x,sigma_y,centroid_x,centroid_y,amplitude\n")
+            f.write("gate,time,z,sigma_x,sigma_y,")
+            f.write("centroid_x,centroid_y,amplitude\n")
 
         for gatenum in range(self.gate):
             tssp_map = self.work_dir + f"tssp_map/tssp(gate={gatenum}).csv"
@@ -53,15 +54,21 @@ class Fitter:
             tssp = np.reshape(tssp,
                               (self.total_depth, self.inputx, self.inputy))
 
-            for z in range(self.total_depth):
-                try:
-                    popt = self.find_nearest_gaussian_param(tssp[z])
-                except:
-                    continue
+            temp = np.zeros((self.inputx, self.inputy))
+            for z in range(self.dmua_depth_init,
+                           self.dmua_depth_init + self.dmua_depth):
+                temp += tssp[z]
 
-                with open(self.work_dir + "tssp_fit.csv", 'a') as f:
-                    f.write(f"{gatenum},{z},{popt[2]},{popt[3]},")
-                    f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
+            try:
+                popt = self.find_nearest_gaussian_param(temp)
+            except:
+                continue
+
+            with open(self.work_dir + "tssp_fit.csv", 'a') as f:
+                f.write(f"{gatenum},{gatenum*250+125},")
+                f.write(f"{self.dmua_depth_init}+{self.dmua_depth - 1},")
+                f.write(f"{popt[2]},{popt[3]},")
+                f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
 
     def dod_gparam(self):
         with open(self.work_dir + "/dOD/dOD_fit.csv", 'w') as f:
@@ -70,9 +77,9 @@ class Fitter:
 
         for pixelsize in range(self.pixel_min, self.pixel_max + 1):
             for r in range(self.dmua_r_min, self.dmua_r_max + 1):
-                dod_map = self.work_dir +
-                          f"/dOD/dOD(z={self.dmua_depth_init}+" +
-                          f"{self.dmua_depth - 1},dmuar={r}," +
+                dod_map = self.work_dir +\
+                          f"/dOD/dOD(z={self.dmua_depth_init}+" +\
+                          f"{self.dmua_depth - 1},dmuar={r}," +\
                           f"pixel={pixelsize}).csv"
                 dod = np.loadtxt(dod_map, delimiter=',')
 
@@ -83,13 +90,13 @@ class Fitter:
 
                 with open(self.work_dir + "/dOD/dOD_fit.csv", 'a') as f:
                     f.write(f"{self.dmua_depth_init}+{self.dmua_depth - 1},")
-                    f.write(f",{r},{pixelsize},{popt[2]},{popt[3]},")
+                    f.write(f"{r},{pixelsize},{popt[2]},{popt[3]},")
                     f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
 
 
 def main():
     fitter = Fitter(sys.argv[1])
-    fitter.dod_gparam()
+    fitter.tssp_gparam()
 
 
 if __name__ == '__main__':

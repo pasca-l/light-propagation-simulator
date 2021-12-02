@@ -14,7 +14,7 @@ class DodTopography:
         self.dmua_depth_init = 14
         self.dmua_depth = 4
         self.dmua = 0.002
-        self.dmua_r = 1
+        self.dmua_r = 11
         self.gate = 15
         self.pixel_size = 1
 
