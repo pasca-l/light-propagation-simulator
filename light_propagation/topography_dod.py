@@ -11,12 +11,14 @@ class DodTopography:
         self.inputx = 61
         self.inputy = 61
         self.total_depth = 28
+        self.gate = 15
         self.dmua_depth_init = 14
         self.dmua_depth = 4
         self.dmua = 0.002
-        self.dmua_r = 11
-        self.gate = 15
-        self.pixel_size = 1
+        self.dmua_r_min = 1
+        self.dmua_r_max = 15
+        self.pixel_min = 1
+        self.pixel_max = 6
 
         # self.ssp_map = np.loadtxt(self.work_dir + "ssp.csv",
         #                           skiprows=1, delimiter=',')
@@ -48,8 +50,7 @@ class DodTopography:
 
         return output
 
-    def create_dmua_map(self, ssp_map):
-        r = self.dmua_r
+    def create_dmua_map(self, ssp_map, r):
         dmua_map = np.zeros_like(ssp_map)
         ymid, xmid = map(lambda f: int(f/2), dmua_map.shape)
 
@@ -64,7 +65,7 @@ class DodTopography:
         dmua_map = np.roll(dmua_map, xmid - r, axis=1)
         # printing area of interest for check
         if self.dmua_map_check:
-            print(dmua_map[ymid-r:ymid+r+1,xmid-r:xmid+r+1])
+            print(dmua_map[ymid-r:ymid+r+1, xmid-r:xmid+r+1])
 
         return dmua_map
 
@@ -82,14 +83,22 @@ class DodTopography:
 
                 if self.dmua_map_check:
                     np.savetxt(self.dmua_dir + f"/dmua({i},{j}).csv",
-                               relative_dmua_map[29:90,29:90],
+                               relative_dmua_map[29:90, 29:90],
                                delimiter=',', fmt='%lf')
 
         return dod_map
 
-    def replace_to_representative(self):
-        # 注目画素を一定間隔でとり，それを代表値として周りのn画素をその値に置き換え
-        return
+    def replace_to_representative(self, dod_map, pixelsize):
+        offset = pixelsize // 2
+        for y in range(offset, self.inputy, pixelsize):
+            for x in range(offset, self.inputx, pixelsize):
+                rep = dod_map[y][x]
+                if pixelsize % 2 == 1:
+                    dod_map[y-offset:y+offset+1, x-offset:x+offset+1] = rep
+                elif pixelsize % 2 == 0:
+                    dod_map[y-offset:y+offset, x-offset:x+offset] = rep
+
+        return dod_map
 
     def make_topography(self, dod_map, save_name):
         image = np.zeros_like(dod_map)
@@ -110,21 +119,26 @@ class DodTopography:
         plt.close()
 
     def topography_of_dod(self):
-        ssp_with_buffer = np.zeros((2*self.inputx-1, 2*self.inputy-1))
+        ssp_with_buffer = np.zeros((2 * self.inputx - 1, 2 * self.inputy - 1))
         for z in range(self.dmua_depth_init,
                        self.dmua_depth_init + self.dmua_depth):
             ssp_with_buffer += self.add_surrounding_zeros(self.ssp[z])
 
-        dmua_map = self.create_dmua_map(ssp_with_buffer)
-        dod_map = np.zeros((self.inputx, self.inputy))
+        for r in range(self.dmua_r_min, self.dmua_r_max + 1):
+            dmua_map = self.create_dmua_map(ssp_with_buffer, r)
+            dod_map = np.zeros((self.inputx, self.inputy))
 
-        dod_map = self.convolute_maps(dod_map, dmua_map, ssp_with_buffer)
+            dod_map = self.convolute_maps(dod_map, dmua_map, ssp_with_buffer)
 
-        save_as = self.dod_dir +\
-                  f"dOD(z={self.dmua_depth_init}+{self.dmua_depth - 1}," +\
-                  f"dmuar={self.dmua_r},pixel={self.pixel_size})"
-        np.savetxt(save_as + ".csv", dod_map, delimiter=',', fmt='%lf')
-        self.make_topography(dod_map, save_as + ".png")
+            for pixel in range(self.pixel_min, self.pixel_max + 1):
+                dod_topo = self.replace_to_representative(dod_map, pixel)
+
+                save_as = self.dod_dir +\
+                          f"dOD(z={self.dmua_depth_init}+" +\
+                          f"{self.dmua_depth - 1},dmuar={r},pixel={pixel})"
+                np.savetxt(save_as + ".csv", dod_topo,
+                           delimiter=',', fmt='%lf')
+                self.make_topography(dod_map, save_as + ".png")
 
     def topography_of_psf(self):
         psf_map = np.zeros((self.inputx, self.inputy))
