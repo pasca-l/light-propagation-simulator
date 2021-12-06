@@ -18,7 +18,7 @@ class DodTopography:
         self.dmua_r_min = 1
         self.dmua_r_max = 15
         self.pixel_min = 1
-        self.pixel_max = 6
+        self.pixel_max = 5
 
         # self.ssp_map = np.loadtxt(self.work_dir + "ssp.csv",
         #                           skiprows=1, delimiter=',')

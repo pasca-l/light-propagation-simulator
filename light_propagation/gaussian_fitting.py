@@ -18,7 +18,7 @@ class Fitter:
         self.dmua_r_min = 1
         self.dmua_r_max = 15
         self.pixel_min = 1
-        self.pixel_max = 6
+        self.pixel_max = 5
 
     def twoD_gaussian(self, coord, cen_x, cen_y, sig_x, sig_y, amp):
         x, y = coord

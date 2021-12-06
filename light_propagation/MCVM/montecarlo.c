@@ -28,19 +28,20 @@ Calculates intensity and partial path length with given settings and model
 typedef char string[STRSIZE];
 
 static FILE *fp_base, *fp_model, *fp_note, *fp_data, *fp_pd, *fp_path, *fp_com;
-static string baseconf  = "settings.conf";
-static string modelconf = "model.conf";
-static string note      = "../data/temporary_note.txt";
-static string datafile  = "../data/binary.data";
-static string pdfile    = "../data/binary.pd";
-static string pathfile  = "../data/binary.ssp";
-static string comfile   = "../data/summary.com";
+static string baseconf   = "settings.conf";
+static string modelconf  = "model.conf";
+static string note       = "../data/temporary_note.txt";
+static string datafile   = "../data/binary.data";
+static string pdfile     = "../data/binary.pd";
+static string pathfile   = "../data/binary.ssp";
+static string comfile    = "../data/summary.com";
 
-static FILE *fp_int, *fp_pathl, *fp_ssp, *fp_tssp;
-static string intfile   = "../data/intensity.csv";
-static string pathlfile = "../data/layer_path.csv";
-static string sspfile   = "../data/ssp.csv";
-static string tsspfile  = "../data/tssp_map/tssp";
+static FILE *fp_int, *fp_pathl, *fp_tpathl, *fp_ssp, *fp_tssp;
+static string intfile    = "../data/intensity.csv";
+static string pathlfile  = "../data/layer_path.csv";
+static string tpathlfile = "../data/layer_tpath.csv";
+static string sspfile    = "../data/ssp.csv";
+static string tsspfile   = "../data/tssp_map/tssp";
 /* ======================================================================== */
 
 /* global variables to be altered ========================================= */
@@ -502,7 +503,6 @@ void SaveDataAsCsv(){
 
     /* path length per layer */
     /* used for low number of photon input to check trend */
-    /*
     if((fp_pathl = fopen(pathlfile, "w")) == NULL){
         fprintf(stderr, "%s can not open\n", pathlfile);
         exit(1);
@@ -515,9 +515,22 @@ void SaveDataAsCsv(){
         }
     }
     fclose(fp_pathl);
-    */
 
-    /* partial path length */
+    /*  */
+    if((fp_pathl = fopen(pathlfile, "w")) == NULL){
+        fprintf(stderr, "%s can not open\n", pathlfile);
+        exit(1);
+    }
+
+    fprintf(fp_pathl, "layer,path length\n");
+    for(int i = 0; i < MAX_DET; i++){
+        for(int j = 0; j < MAX_LAYER; j++){
+            fprintf(fp_pathl, "%d,%lf\n", j, PPATH[i][j]);
+        }
+    }
+    fclose(fp_pathl);
+
+    /* partial path length (spatial sensitivity profile) */
     if((fp_ssp = fopen(sspfile, "w")) == NULL){
         fprintf(stderr, "%s can not open\n", sspfile);
         exit(1);
