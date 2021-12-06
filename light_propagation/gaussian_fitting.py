@@ -11,7 +11,7 @@ class Fitter:
         self.inputy = 61
 
         self.total_depth = 28
-        self.gate = 16
+        self.total_gates = 16
 
         self.dmua_depth_init = 14
         self.dmua_depth = 4
@@ -19,6 +19,8 @@ class Fitter:
         self.dmua_r_max = 15
         self.pixel_min = 1
         self.pixel_max = 5
+        self.dod_gate = 15
+        self.dod_dir = self.work_dir + f"dOD(gate={self.dod_gate})/"
 
     def twoD_gaussian(self, coord, cen_x, cen_y, sig_x, sig_y, amp):
         x, y = coord
@@ -48,7 +50,7 @@ class Fitter:
             f.write("gate,time,z,sigma_x,sigma_y,")
             f.write("centroid_x,centroid_y,amplitude\n")
 
-        for gatenum in range(self.gate):
+        for gatenum in range(self.total_gates):
             tssp_map = self.work_dir + f"tssp_map/tssp(gate={gatenum}).csv"
             tssp = np.loadtxt(tssp_map, skiprows=2, delimiter=',')
             tssp = np.reshape(tssp,
@@ -71,14 +73,14 @@ class Fitter:
                 f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
 
     def dod_gparam(self):
-        with open(self.work_dir + "/dOD/dOD_fit.csv", 'w') as f:
+        with open(self.dod_dir + "dOD_fit.csv", 'w') as f:
             f.write("z,dmuar,pixel,sigma_x,sigma_y,")
             f.write("centroid_x,centroid_y,amplitude\n")
 
         for pixelsize in range(self.pixel_min, self.pixel_max + 1):
             for r in range(self.dmua_r_min, self.dmua_r_max + 1):
-                dod_map = self.work_dir +\
-                          f"/dOD/dOD(z={self.dmua_depth_init}+" +\
+                dod_map = self.dod_dir +\
+                          f"dOD(z={self.dmua_depth_init}+" +\
                           f"{self.dmua_depth - 1},dmuar={r}," +\
                           f"pixel={pixelsize}).csv"
                 dod = np.loadtxt(dod_map, delimiter=',')
@@ -88,7 +90,7 @@ class Fitter:
                 except:
                     continue
 
-                with open(self.work_dir + "/dOD/dOD_fit.csv", 'a') as f:
+                with open(self.dod_dir + "dOD_fit.csv", 'a') as f:
                     f.write(f"{self.dmua_depth_init}+{self.dmua_depth - 1},")
                     f.write(f"{r},{pixelsize},{popt[2]},{popt[3]},")
                     f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")

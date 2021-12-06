@@ -28,7 +28,7 @@ class DodTopography:
         self.ssp = np.reshape(self.ssp_map,
                               (self.total_depth, self.inputx, self.inputy))
 
-        self.dod_dir = self.work_dir + "dOD/"
+        self.dod_dir = self.work_dir + f"dOD(gate={self.gate})/"
         if not os.path.exists(self.dod_dir):
             os.makedirs(self.dod_dir)
 
