@@ -54,7 +54,7 @@ static string tsspfile   = "../data/tssp_map/tssp";
 #define MAX_Y       30       /* data save y (-MAX_Y < MAX_Y)*/
 #define MAX_Z       28       /* data save z (0 < MAX_Z)*/
 
-#define MT          400      /* number of division for TPSF */
+#define MT          400      /* number of division for TR path length */
 #define DT          10       /* time(ps) per division */
 #define MT_PD       80       /* number of division for TR photon density*/
 #define DT_PD       50       /* time(ps) per division */
@@ -488,14 +488,14 @@ void SaveDataAsCsv(){
     }
 
     fprintf(fp_int, "time");
-    for(int i = 0; i < MAX_DET; i++){
-        fprintf(fp_int, ",detector[%d]", i);
+    for(int d = 0; d < MAX_DET; d++){
+        fprintf(fp_int, ",[det%d]", d);
     }
     fprintf(fp_int, "\n");
-    for(int i = 0; i < MT; i++){
-        fprintf(fp_int, "%d", (i + 1) * DT);
-        for(int j = 0; j < MAX_DET; j++){
-            fprintf(fp_int, ",%.6e", INTENSITY[j][i] / phot_in);
+    for(int t = 0; t < MT; t++){
+        fprintf(fp_int, "%d", (t + 1) * DT);
+        for(int d = 0; d < MAX_DET; d++){
+            fprintf(fp_int, ",%.6e", INTENSITY[d][t] / phot_in);
         }
         fprintf(fp_int, "\n");
     }
@@ -503,6 +503,7 @@ void SaveDataAsCsv(){
 
     /* path length per layer */
     /* used for low number of photon input to check trend */
+    /*
     if((fp_pathl = fopen(pathlfile, "w")) == NULL){
         fprintf(stderr, "%s can not open\n", pathlfile);
         exit(1);
@@ -515,6 +516,7 @@ void SaveDataAsCsv(){
         }
     }
     fclose(fp_pathl);
+    */
 
     /* time-resolved path length per layer */
     if((fp_tpathl = fopen(tpathlfile, "w")) == NULL){
@@ -522,13 +524,28 @@ void SaveDataAsCsv(){
         exit(1);
     }
 
-    fprintf(fp_tpathl, "layer,gate,path length\n");
-    for(int i = 0; i < MAX_LAYER; i++){
-        for(int t = 0; t < MT; t++){
-            for(int j = 0; j < MAX_DET; j++){
-                fprintf(fp_tpathl, "%d,%d,%lf\n", i, t, TPPATH[j][t][i]);
+    fprintf(fp_tpathl, "time");
+    for(int d = 0; d < MAX_DET; d++){
+        for(int l = 0; l < MAX_LAYER; l++){
+            fprintf(fp_tpathl, ",layer%d [det%d]", l, d);
+        }
+    }
+    fprintf(fp_tpathl, "\n");
+
+    for(int t = 0; t < MT; t++){
+        fprintf(fp_tpathl, "%d", (t + 1) * DT);
+        for(int d = 0; d < MAX_DET; d++){
+            for(int l = 0; l < MAX_LAYER; l++){
+                if(INTENSITY[d][t] == 0){
+                    fprintf(fp_tpathl, "%lf", 0.0);
+                }
+                else{
+                    fprintf(fp_tpathl, ",%lf",
+                            TPPATH[d][t][l] / INTENSITY[d][t]);
+                }
             }
         }
+        fprintf(fp_tpathl, "\n");
     }
     fclose(fp_tpathl);
 
@@ -538,12 +555,22 @@ void SaveDataAsCsv(){
         exit(1);
     }
 
-    for(int i = 0; i < MAX_DET; i++){
-        fprintf(fp_ssp, "Detector[%d],%d depths\n", i, MAX_Z);
+    double int_sum = 0;
+    for(int d = 0; d < MAX_DET; d++){
+        for(int t = 0; t < MT_SSP; t++){
+            int_sum += intensity_for_ssp[d][t];
+        }
+
+        fprintf(fp_ssp, "[det%d] %d depths\n", d, MAX_Z);
         for(int z = 0; z < MAX_Z; z++){
             for(int y = 0; y < 2*MAX_Y+1; y++){
                 for(int x = 0; x < 2*MAX_X+1; x++){
-                    fprintf(fp_ssp, "%lf", SSP[i][z][x][y]);
+                    if(int_sum == 0){
+                        fprintf(fp_ssp, "%lf", 0.0);
+                    }
+                    else{
+                        fprintf(fp_ssp, "%lf", SSP[d][z][x][y] / int_sum);
+                    }
                     if(x != 2*MAX_X){
                         fprintf(fp_ssp, ",");
                     }
@@ -570,12 +597,18 @@ void SaveDataAsCsv(){
         }
 
         fprintf(fp_tssp, "Between %d - %d ps\n", t * DT_SSP, (t + 1) * DT_SSP);
-        for(int i = 0; i < MAX_DET; i++){
-            fprintf(fp_tssp, "Detector[%d],%d depths\n", i, MAX_Z);
+        for(int d = 0; d < MAX_DET; d++){
+            fprintf(fp_tssp, "[det%d] %d depths\n", d, MAX_Z);
             for(int z = 0; z < MAX_Z; z++){
                 for(int y = 0; y < 2*MAX_Y+1; y++){
                     for(int x = 0; x < 2*MAX_X+1; x++){
-                        fprintf(fp_tssp, "%lf", TSSP[i][t][z][x][y]);
+                        if(intensity_for_ssp[d][t] == 0){
+                            fprintf(fp_tssp, "%lf", 0.0);
+                        }
+                        else{
+                            fprintf(fp_tssp, "%lf",
+                                TSSP[d][t][z][x][y] / intensity_for_ssp[d][t]);
+                        }
                         if(x != 2*MAX_X){
                             fprintf(fp_tssp, ",");
                         }
