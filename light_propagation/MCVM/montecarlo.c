@@ -55,11 +55,11 @@ static string tsspfile   = "../data/tssp_map/tssp";
 #define MAX_Z       28       /* data save z (0 < MAX_Z)*/
 
 #define MT          400      /* number of division for TPSF */
-#define DT          10
+#define DT          10       /* time(ps) per division */
 #define MT_PD       80       /* number of division for TR photon density*/
-#define DT_PD       50
+#define DT_PD       50       /* time(ps) per division */
 #define MT_SSP      16       /* number of division for TR SS profile */
-#define DT_SSP      250
+#define DT_SSP      250      /* time(ps) per division */
 #define INT_CUT     0.0001   /* cutoff intensity for weight */
 #define MAX_SCATTER 100000
 /* ======================================================================== */
@@ -509,26 +509,28 @@ void SaveDataAsCsv(){
     }
 
     fprintf(fp_pathl, "layer,path length\n");
-    for(int i = 0; i < MAX_DET; i++){
-        for(int j = 0; j < MAX_LAYER; j++){
-            fprintf(fp_pathl, "%d,%lf\n", j, PPATH[i][j]);
+    for(int i = 0; i < MAX_LAYER; i++){
+        for(int j = 0; j < MAX_DET; j++){
+            fprintf(fp_pathl, "%d,%lf\n", i, PPATH[j][i]);
         }
     }
     fclose(fp_pathl);
 
-    /*  */
-    if((fp_pathl = fopen(pathlfile, "w")) == NULL){
-        fprintf(stderr, "%s can not open\n", pathlfile);
+    /* time-resolved path length per layer */
+    if((fp_tpathl = fopen(tpathlfile, "w")) == NULL){
+        fprintf(stderr, "%s can not open\n", tpathlfile);
         exit(1);
     }
 
-    fprintf(fp_pathl, "layer,path length\n");
-    for(int i = 0; i < MAX_DET; i++){
-        for(int j = 0; j < MAX_LAYER; j++){
-            fprintf(fp_pathl, "%d,%lf\n", j, PPATH[i][j]);
+    fprintf(fp_tpathl, "layer,gate,path length\n");
+    for(int i = 0; i < MAX_LAYER; i++){
+        for(int t = 0; t < MT; t++){
+            for(int j = 0; j < MAX_DET; j++){
+                fprintf(fp_tpathl, "%d,%d,%lf\n", i, t, TPPATH[j][t][i]);
+            }
         }
     }
-    fclose(fp_pathl);
+    fclose(fp_tpathl);
 
     /* partial path length (spatial sensitivity profile) */
     if((fp_ssp = fopen(sspfile, "w")) == NULL){
