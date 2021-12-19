@@ -20,7 +20,6 @@ class Fitter:
         self.pixel_min = 1
         self.pixel_max = 5
         self.dod_gate = time_gate
-        self.dod_dir = self.work_dir + f"dOD(gate={self.dod_gate})/"
 
     def twoD_gaussian(self, coord, cen_x, cen_y, sig_x, sig_y, amp):
         x, y = coord
@@ -73,13 +72,15 @@ class Fitter:
                 f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
 
     def dod_gparam(self):
-        with open(self.dod_dir + "dOD_fit.csv", 'w') as f:
+        dod_dir = self.work_dir + f"dOD(gate={self.dod_gate})/"
+
+        with open(dod_dir + "dOD_fit.csv", 'w') as f:
             f.write("z,dmuar,pixel,sigma_x,sigma_y,")
             f.write("centroid_x,centroid_y,amplitude\n")
 
         for pixelsize in range(self.pixel_min, self.pixel_max + 1):
             for r in range(self.dmua_r_min, self.dmua_r_max + 1):
-                dod_map = self.dod_dir +\
+                dod_map = dod_dir +\
                           f"dOD(z={self.dmua_depth_init}+" +\
                           f"{self.dmua_depth - 1},dmuar={r}," +\
                           f"pixel={pixelsize}).csv"
@@ -90,7 +91,7 @@ class Fitter:
                 except:
                     continue
 
-                with open(self.dod_dir + "dOD_fit.csv", 'a') as f:
+                with open(dod_dir + "dOD_fit.csv", 'a') as f:
                     f.write(f"{self.dmua_depth_init}+{self.dmua_depth - 1},")
                     f.write(f"{r},{pixelsize},{popt[2]},{popt[3]},")
                     f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
@@ -108,7 +109,7 @@ class Fitter:
 def main():
     gates = [6, 15]
     for gate in gates:
-        fitter = Fitter(sys.argv[1])
+        fitter = Fitter(sys.argv[1], gate)
         fitter.tssp_gparam()
         fitter.dod_gparam()
 
