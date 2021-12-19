@@ -95,6 +95,15 @@ class Fitter:
                     f.write(f"{r},{pixelsize},{popt[2]},{popt[3]},")
                     f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
 
+    # # illustrates the best-fit 2d gaussian distribution
+    # def draw_nearest_gaussian(self, dod_map):
+    #     dod = np.loadtxt(dod_map, delimiter=',')
+    #
+    #     try:
+    #         popt = self.find_nearest_gaussian_param(dod)
+    #     except:
+    #         return
+
 
 def main():
     fitter = Fitter(sys.argv[1])
