@@ -4,7 +4,7 @@ import numpy as np
 import scipy.optimize as opt
 
 class Fitter:
-    def __init__(self, dirname):
+    def __init__(self, dirname, time_gate):
         self.work_dir = f"./results/{dirname}/"
 
         self.inputx = 61
@@ -19,7 +19,7 @@ class Fitter:
         self.dmua_r_max = 15
         self.pixel_min = 1
         self.pixel_max = 5
-        self.dod_gate = 15
+        self.dod_gate = time_gate
         self.dod_dir = self.work_dir + f"dOD(gate={self.dod_gate})/"
 
     def twoD_gaussian(self, coord, cen_x, cen_y, sig_x, sig_y, amp):
@@ -106,9 +106,11 @@ class Fitter:
 
 
 def main():
-    fitter = Fitter(sys.argv[1])
-    fitter.tssp_gparam()
-    fitter.dod_gparam()
+    gates = [6, 15]
+    for gate in gates:
+        fitter = Fitter(sys.argv[1])
+        fitter.tssp_gparam()
+        fitter.dod_gparam()
 
 
 if __name__ == '__main__':

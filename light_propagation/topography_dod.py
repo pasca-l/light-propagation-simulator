@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class DodTopography:
-    def __init__(self, dirname):
+    def __init__(self, dirname, time_gate):
         self.work_dir = f"./results/{dirname}/"
         self.dmua_map_check = False
 
         self.inputx = 61
         self.inputy = 61
         self.total_depth = 28
-        self.gate = 15
+        self.gate = time_gate
         self.dmua_depth_init = 14
         self.dmua_depth = 4
         self.dmua = 0.002
@@ -157,9 +157,11 @@ class DodTopography:
 
 
 def main():
-    topo = DodTopography(sys.argv[1])
-    topo.topography_of_dod()
-    topo.topography_of_psf()
+    gates = [6, 15]
+    for gate in gates:
+        topo = DodTopography(sys.argv[1], gate)
+        topo.topography_of_dod()
+        topo.topography_of_psf()
 
 
 if __name__ == '__main__':
