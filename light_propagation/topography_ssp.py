@@ -12,7 +12,11 @@ class SspTopography:
         self.total_depth = 28
         self.gate = 16
 
-    def make_topography(self, z, ssp_map, save_name):
+    def make_topography(self, z, ssp_map, save_name, csv_flag=False):
+        if csv_flag:
+            np.savetxt(save_name + ".csv", ssp_map[z],
+                       delimiter=',', fmt='%lf')
+
         image = np.zeros_like(ssp_map[z])
         if ssp_map[z].max() != 0:
             image = ssp_map[z] / ssp_map[z].max()
@@ -22,7 +26,7 @@ class SspTopography:
         plt.colorbar()
         plt.clim(0, 1)
 
-        fig.savefig(save_name)
+        fig.savefig(save_name + ".png")
 
         plt.clf()
         plt.close()
@@ -39,7 +43,7 @@ class SspTopography:
             os.makedirs(ssp_topo_dir)
 
         for z in range(self.total_depth):
-            self.make_topography(z, ssp, ssp_topo_dir + f"ssp(z={z}).png")
+            self.make_topography(z, ssp, ssp_topo_dir + f"ssp(z={z})")
 
     def topography_of_tssp(self):
         tssp_topo_dir = self.work_dir + "tssp_topography/"
@@ -55,7 +59,7 @@ class SspTopography:
             for z in range(self.total_depth):
                 self.make_topography(z, tssp,
                                      tssp_topo_dir +
-                                     f"tssp(gate={gatenum},z={z}).png")
+                                     f"tssp(gate={gatenum},z={z})")
 
 
 def main():
