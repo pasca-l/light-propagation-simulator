@@ -106,11 +106,11 @@ class DodTopography:
             image = dod_map / dod_map.max()
 
         # save image without axis and legend
-        plt.imsave(save_name[:-4] + "_img.png", image, cmap='hot')
+        plt.imsave(save_name[:-4] + "_img.png", image, cmap='jet')
 
         # save image with axis and legend
         fig = plt.figure()
-        plt.imshow(image, cmap='hot')
+        plt.imshow(image, cmap='jet')
         plt.colorbar()
         plt.clim(0, 1)
         fig.savefig(save_name)

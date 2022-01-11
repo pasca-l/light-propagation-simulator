@@ -11,15 +11,17 @@ class SspTopography:
         self.inputy = 61
         self.total_depth = 28
         self.gate = 16
+        self.depth_init = 14
+        self.depth = 4
 
-    def make_topography(self, z, ssp_map, save_name, csv_flag=False):
+    def make_topography(self, ssp_map, save_name, csv_flag=False):
         if csv_flag:
-            np.savetxt(save_name + ".csv", ssp_map[z],
+            np.savetxt(save_name + ".csv", ssp_map,
                        delimiter=',', fmt='%lf')
 
-        image = np.zeros_like(ssp_map[z])
-        if ssp_map[z].max() != 0:
-            image = ssp_map[z] / ssp_map[z].max()
+        image = np.zeros_like(ssp_map)
+        if ssp_map.max() != 0:
+            image = ssp_map / ssp_map.max()
 
         fig = plt.figure()
         plt.imshow(image, cmap='hot')
@@ -43,7 +45,7 @@ class SspTopography:
             os.makedirs(ssp_topo_dir)
 
         for z in range(self.total_depth):
-            self.make_topography(z, ssp, ssp_topo_dir + f"ssp(z={z})")
+            self.make_topography(ssp[z], ssp_topo_dir + f"ssp(z={z})")
 
     def topography_of_tssp(self):
         tssp_topo_dir = self.work_dir + "tssp_topography/"
@@ -56,10 +58,13 @@ class SspTopography:
             tssp = np.reshape(tssp,
                               (self.total_depth, self.inputx, self.inputy))
 
-            for z in range(self.total_depth):
-                self.make_topography(z, tssp,
-                                     tssp_topo_dir +
-                                     f"tssp(gate={gatenum},z={z})")
+            psf_map = np.zeros((self.inputx, self.inputy))
+            for z in range(self.depth_init, self.depth_init + self.depth):
+                psf_map += tssp[z]
+
+            self.make_topography(psf_map, tssp_topo_dir +\
+                                 f"tssp(gate={gatenum},z={self.depth_init}+" +\
+                                 f"{self.depth})")
 
 
 def main():
