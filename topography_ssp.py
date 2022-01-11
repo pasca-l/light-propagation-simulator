@@ -16,8 +16,7 @@ class SspTopography:
 
     def make_topography(self, ssp_map, save_name, csv_flag=False):
         if csv_flag:
-            np.savetxt(save_name + ".csv", ssp_map,
-                       delimiter=',', fmt='%lf')
+            np.savetxt(save_name + ".csv", ssp_map, delimiter=',', fmt='%lf')
 
         image = np.zeros_like(ssp_map)
         if ssp_map.max() != 0:

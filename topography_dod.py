@@ -100,7 +100,10 @@ class DodTopography:
 
         return dod_map
 
-    def make_topography(self, dod_map, save_name):
+    def make_topography(self, dod_map, save_name, csv_flag=False):
+        if csv_flag:
+            np.savetxt(save_name + ".csv", ssp_map, delimiter=',', fmt='%lf')
+
         image = np.zeros_like(dod_map)
         if dod_map.max() != 1:
             image = dod_map / dod_map.max()
