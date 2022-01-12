@@ -12,6 +12,7 @@ class Fitter:
 
         self.total_depth = 28
         self.total_gates = 16
+        self.gate_width = 1
 
         self.dmua_depth_init = 14
         self.dmua_depth = 4
@@ -44,27 +45,34 @@ class Fitter:
         return popt
 
     def tssp_gparam(self):
-        with open(self.work_dir + "tssp_fit.csv", 'w') as f:
+        tssp_topo_dir = self.work_dir +\
+                        f"tssp_topography(gatewidth={self.gate_width})/"
+
+        with open(tssp_topo_dir + "tssp_fit.csv", 'w') as f:
             f.write("gate,time,z,sigma_x,sigma_y,")
             f.write("centroid_x,centroid_y,amplitude\n")
 
-        for gatenum in range(self.total_gates):
-            tssp_map = self.work_dir + f"tssp_map/tssp(gate={gatenum}).csv"
-            tssp = np.loadtxt(tssp_map, skiprows=2, delimiter=',')
-            tssp = np.reshape(tssp,
-                              (self.total_depth, self.inputx, self.inputy))
+        for gatenum in range(0, self.total_gates, self.gate_width):
+            tssp_map = self.work_dir +\
+                       f"tssp_topography(gatewidth={self.gate_width})/" +\
+                       f"tssp(gate={gatenum}+{self.gate_width - 1}," +\
+                       f"z={self.dmua_depth_init}+{self.dmua_depth}).csv"
+            tssp = np.loadtxt(tssp_map, delimiter=',')
 
-            temp = np.zeros((self.inputx, self.inputy))
-            for z in range(self.dmua_depth_init,
-                           self.dmua_depth_init + self.dmua_depth):
-                temp += tssp[z]
+            # tssp = np.reshape(tssp,
+            #                   (self.total_depth, self.inputx, self.inputy))
+            #
+            # temp = np.zeros((self.inputx, self.inputy))
+            # for z in range(self.dmua_depth_init,
+            #                self.dmua_depth_init + self.dmua_depth):
+            #     temp += tssp[z]
 
             try:
-                popt = self.find_nearest_gaussian_param(temp)
+                popt = self.find_nearest_gaussian_param(tssp)
             except:
                 continue
 
-            with open(self.work_dir + "tssp_fit.csv", 'a') as f:
+            with open(tssp_topo_dir + "tssp_fit.csv", 'a') as f:
                 f.write(f"{gatenum},{gatenum*250+125},")
                 f.write(f"{self.dmua_depth_init}+{self.dmua_depth - 1},")
                 f.write(f"{popt[2]},{popt[3]},")
@@ -108,9 +116,9 @@ class Fitter:
 def main():
     fitter = Fitter(sys.argv[1])
     fitter.tssp_gparam()
-    gates = [6, 15]
-    for gate in gates:
-        fitter.dod_gparam(gate)
+    # gates = [6, 15]
+    # for gate in gates:
+    #     fitter.dod_gparam(gate)
 
 
 if __name__ == '__main__':

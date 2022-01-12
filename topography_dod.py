@@ -6,12 +6,12 @@ import numpy as np
 class DodTopography:
     def __init__(self, dirname, time_gate):
         self.work_dir = f"./results/{dirname}/"
+        self.gate = time_gate
         self.dmua_map_check = False
 
         self.inputx = 61
         self.inputy = 61
         self.total_depth = 28
-        self.gate = time_gate
         self.dmua_depth_init = 14
         self.dmua_depth = 4
         self.dmua = 0.002
