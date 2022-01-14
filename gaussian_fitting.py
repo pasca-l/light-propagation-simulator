@@ -74,7 +74,7 @@ class Fitter:
                 f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
 
     def camera_dod_gparam(self, dod_gate):
-        dod_dir = self.work_dir + f"camera/dOD(gate={dod_gate})/"
+        dod_dir = self.work_dir + f"dOD(gate={dod_gate})/camera/"
 
         with open(dod_dir + "dOD_fit.csv", 'w') as f:
             f.write("z,dmuar,pixel,sigma_x,sigma_y,")
@@ -99,7 +99,7 @@ class Fitter:
                     f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
 
     def scan_dod_gparam(self, dod_gate):
-        dod_dir = self.work_dir + f"scan/dOD(gate={dod_gate})/"
+        dod_dir = self.work_dir + f"dOD(gate={dod_gate})/scan/"
 
         with open(dod_dir + "dOD_fit.csv", 'w') as f:
             f.write("z,dmuar,interval,sigma_x,sigma_y,")
@@ -140,9 +140,10 @@ def main():
     fitter.tssp_gparam()
 
     # fitting dod topography
-    # gates = [6, 15]
-    # for gate in gates:
-    #     fitter.dod_gparam(gate)
+    gates = [12]
+    for gate in gates:
+        fitter.camera_dod_gparam(gate)
+        fitter.scan_dod_gparam(gate)
 
 
 if __name__ == '__main__':

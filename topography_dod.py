@@ -103,13 +103,6 @@ class DodTopography:
         return dod_map
 
     def spline_complement(self, dod_map, intervalsize):
-        data_xaxis = np.arange(0, dod_map.shape[0], intervalsize)
-        data_yaxis = np.arange(0, dod_map.shape[1], intervalsize)
-        data_xgrid, data_ygrid = np.meshgrid(data_xaxis, data_yaxis)
-        data = dod_map[data_xgrid, data_ygrid]
-
-        f = interpolate.interp2d(data_xaxis, data_yaxis, data, kind='cubic')
-
         # image of scanned measurement points
         # mask = np.zeros_like(dod_map)
         # for y in range(0, mask.shape[1], intervalsize):
@@ -117,6 +110,14 @@ class DodTopography:
         #         data_xaxis =
         #         mask[x, y] = 1
         # mask = mask * dod_map
+        # return mask
+
+        data_xaxis = np.arange(0, dod_map.shape[0], intervalsize)
+        data_yaxis = np.arange(0, dod_map.shape[1], intervalsize)
+        data_xgrid, data_ygrid = np.meshgrid(data_xaxis, data_yaxis)
+        data = dod_map[data_xgrid, data_ygrid]
+
+        f = interpolate.interp2d(data_xaxis, data_yaxis, data, kind='cubic')
 
         map_xaxis = np.arange(dod_map.shape[0])
         map_yaxis = np.arange(dod_map.shape[1])
@@ -125,7 +126,7 @@ class DodTopography:
 
         return dod_map
 
-    def make_topography(self, dod_map, save_name, csv_flag=False,
+    def make_topography(self, dod_map, save_name, csv_flag=True,
                         norm_flag=False, raw_image=False):
         if csv_flag:
             np.savetxt(save_name + ".csv", dod_map, delimiter=',', fmt='%lf')
@@ -204,12 +205,11 @@ class DodTopography:
 
         save_as = self.dod_dir +\
                   f"PSF(z={self.dmua_depth_init}+{self.dmua_depth - 1})"
-        np.savetxt(save_as + ".csv", psf_map, delimiter=',', fmt='%lf')
-        self.make_topography(psf_map, save_as + ".png")
+        self.make_topography(psf_map, save_as)
 
 
 def main():
-    gates = [15]
+    gates = [12]
     for gate in gates:
         topo = DodTopography(sys.argv[1], gate)
         topo.topography_of_dod()
