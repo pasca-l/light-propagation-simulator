@@ -24,6 +24,6 @@ This project holds codes for simulating light propagation through a turbid mediu
 - gaussian_3d_plot.py
     - plots gaussian distribution or image in 3D.
 - generate_topodata.sh
-    - result passed through, topography_ssp.py, topography_dod.py, gaussian_fitting.py.
+    - result passed through: topography_ssp.py, topography_dod.py, gaussian_fitting.py.
 - deconvolute_topography.py
     - deconvolutes given dOD by SSP, by simple division in frequency domain.
