@@ -3,18 +3,19 @@
 ## Project overview
 This project holds codes for simulating light propagation through a turbid medium, assuming a biological tissue that scatters incident photon.
 
-In this project, mainly three things can be done:
+Things that can be done:
 - Montecarlo simulation : accumulates photon weights that are used to calculate intensity and path lengths
 - Topography generation : generates numerical map of SSP (spatial sensitivity profile) and dOD (optical density change)
 - Gaussian distribution fitting : fits topography to gaussian distribution
 
+
 ## Contents
-Simulators
+### Simulators
 - MCML (MonteCarlo simulation for MultiLayered model)
 - MCVM (MonteCarlo simulation for Voxel Model)
     - "results" directory is required by push_data.py
 
-Codes
+### Codes
 - topography_ssp.py
     - generates 2D topography image of (time-resolved) SSP using resulting csv file given from simulators
 - topography_dod.py
@@ -29,5 +30,6 @@ Codes
     - result passed through: topography_ssp.py, topography_dod.py, gaussian_fitting.py
 - deconvolute_topography.py
     - deconvolutes given dOD by SSP, by simple division in frequency domain
+
 
 ## How to use
