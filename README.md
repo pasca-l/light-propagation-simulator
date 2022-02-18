@@ -5,7 +5,7 @@ This project holds codes for simulating light propagation through a turbid mediu
 
 ## Content
 - Montecarlo simulation : accumulates photon weights that are used to calculate intensity and path lengths
-- Topography generation : generates numerical map of SSP (spatial sensitivity profile) and $\Delta$ OD (optical density)
+- Topography generation : generates numerical map of SSP (spatial sensitivity profile) and dOD (optical density)
 - Gaussian distribution fitting : fits topography to gaussian distribution
 
 ## Simulators
