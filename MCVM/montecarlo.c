@@ -1,6 +1,9 @@
 /*
 
 Monte Carlo Program for voxel model
+from mc_fnirs_slab.c written by K.Takai[2014]
+
+rewritten by S.Yamadate[2021]
 
 Calculates intensity and partial path length with given settings and model
 
