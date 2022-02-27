@@ -33,6 +33,3 @@ Things that can be done:
     - result passed through: topography_ssp.py, topography_dod.py, gaussian_fitting.py
 - deconvolute_topography.py
     - deconvolutes given dOD by SSP, by simple division in frequency domain
-
-
-## How to use
