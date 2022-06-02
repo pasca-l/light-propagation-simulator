@@ -19,3 +19,6 @@
 ## How to use
 1. change settings in setting.conf, and model.conf to fit assuming condition
 2. execute exec_montecarlo.sh giving a directory name to save data into
+```shell
+$ exec_montecarlo.sh SAVE_AS_DIR
+```
