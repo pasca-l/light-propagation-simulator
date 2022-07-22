@@ -3,7 +3,7 @@
 ## Requirements
 
 
-## Short description and Usage
+## Description and Usage
 ---
 [***`topography_ssp.py`***](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/topography_ssp.py)
 
@@ -78,7 +78,11 @@ $ python get_profile.py --dirname DATA_DIRECTORY_NAME
 
 Fits gaussian distribution to given image matrix and returns optimized function parameters.
 
-### **STILL WORKING**
+1. Run script, giving the name of the data directory in "results". (Default data directory name is `data`)
+```
+$ python topography_ssp.py --dirname DATA_DIRECTORY_NAME
+```
+> All files related to topography under the directory named `tssp_topography(gatewidth=...)`, `dOD(gate=...)` are searched, and the output is put into a directory named `fit` with files named `tssp_fit`, `dod_camera_fit`, `dod_scan_fit`.
 
 ---
 [***`gaussian_3d_plot.py`***](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/gaussian_3d_plot.py)

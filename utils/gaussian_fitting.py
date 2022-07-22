@@ -1,27 +1,36 @@
+import os
 import argparse
-import matplotlib.pyplot as plt
+import glob
+import re
 import numpy as np
 import scipy.optimize as opt
 
 class Fitter:
     def __init__(self, args):
         self.work_dir = f"../results/{args.dirname}/"
+        self.dod_cam_paths = glob.glob(self.work_dir + "dOD*/camera/*.csv")
+        self.dod_scan_paths = glob.glob(self.work_dir + "dOD*/scan/*.csv")
+        self.ssp_paths = glob.glob(self.work_dir + "tssp_topography*/*.csv")
+        self.all_paths = self.dod_cam_paths + self.dod_scan_paths +\
+                         self.ssp_paths
+
+        self.fit_dir = f"../results/{args.dirname}/fit/"
+        os.makedirs(self.fit_dir, exist_ok=True)
+
+        with open(self.fit_dir + "tssp_fit.csv", 'w') as f:
+            f.write("gatewidth,gate,time,z,sigma_x,sigma_y,")
+            f.write("centroid_x,centroid_y,amplitude\n")
+
+        with open(self.fit_dir + "dod_camera_fit.csv", 'w') as f:
+            f.write("gate,time,z,dmuar,pixel,sigma_x,sigma_y,")
+            f.write("centroid_x,centroid_y,amplitude\n")
+
+        with open(self.fit_dir + "dod_scan_fit.csv", 'w') as f:
+            f.write("gate,time,z,dmuar,interval,sigma_x,sigma_y,")
+            f.write("centroid_x,centroid_y,amplitude\n")
 
         self.inputx = 61
         self.inputy = 61
-
-        self.total_depth = 28
-        self.total_gate = 16
-        self.gate_width = 1
-
-        self.dmua_depth_init = 14
-        self.dmua_depth = 4
-        self.dmua_r_min = 1
-        self.dmua_r_max = 15
-        self.pixel_min = 1
-        self.pixel_max = 6
-        self.interval_min = 1
-        self.interval_max = 6
 
     def twoD_gaussian(self, coord, cen_x, cen_y, sig_x, sig_y, amp):
         x, y = coord
@@ -31,9 +40,8 @@ class Fitter:
         return function.ravel()
 
     def find_nearest_gaussian_param(self, data):
-        xval, yval = np.meshgrid(
-                        np.linspace(0, self.inputx - 1, self.inputx),
-                        np.linspace(0, self.inputy - 1, self.inputy))
+        xval, yval = np.meshgrid(np.linspace(0, self.inputx - 1, self.inputx),
+                                 np.linspace(0, self.inputy - 1, self.inputy))
 
         # gaussian function parameters: cen_x, cen_y, sig_x, sig_y, amp
         initial_guess = (30, 30, 10, 10, 0.01)
@@ -46,91 +54,42 @@ class Fitter:
 
         return popt
 
-    def tssp_gparam(self):
-        tssp_topo_dir = self.work_dir +\
-                        f"tssp_topography(gatewidth={self.gate_width})/"
+    def find_gparam(self):
+        for file in self.all_paths:
+            info = re.findall(r'(?<=\().+?(?=\))', file)
 
-        with open(tssp_topo_dir + "tssp_fit.csv", 'w') as f:
-            f.write("gate,time,z,sigma_x,sigma_y,")
-            f.write("centroid_x,centroid_y,amplitude\n")
+            if file in self.ssp_paths:
+                gate = int(info[1].split(',')[0].split('=')[1].split('+')[0])
+                z = info[1].split(',')[1].split('=')[1]
+                gatewidth = int(info[0].split('=')[1])
+                time = gate * 250 + gatewidth * 125
+            else:
+                gate = int(info[0].split('=')[1])
+                z = info[1].split(',')[0].split('=')[1]
+                dmuar = info[1].split(',')[1].split('=')[1]
+                interval = info[1].split(',')[2].split('=')[1]
+                time = gate * 250 + 125
 
-        for i, gatenum in enumerate(range(0, self.total_gate, self.gate_width)):
-            tssp_map = self.work_dir +\
-                       f"tssp_topography(gatewidth={self.gate_width})/" +\
-                       f"tssp(gate={gatenum}+{self.gate_width - 1}," +\
-                       f"z={self.dmua_depth_init}+{self.dmua_depth}).csv"
-            tssp = np.loadtxt(tssp_map, delimiter=',')
-
+            map = np.loadtxt(file, delimiter=',')
             try:
-                popt = self.find_nearest_gaussian_param(tssp)
+                popt = self.find_nearest_gaussian_param(map)
             except:
                 continue
 
-            with open(tssp_topo_dir + "tssp_fit.csv", 'a') as f:
-                time = i*self.gate_width*250 + (self.gate_width*125)
-                f.write(f"{gatenum},{time},")
-                f.write(f"{self.dmua_depth_init}+{self.dmua_depth - 1},")
-                f.write(f"{popt[2]},{popt[3]},")
-                f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
+            if file in self.ssp_paths:
+                with open(self.fit_dir + "tssp_fit.csv", 'a') as f:
+                    f.write(f"{gatewidth},{gate},{time},{z},{popt[2]},")
+                    f.write(f"{popt[3]},{popt[0]},{popt[1]},{popt[4]}\n")
 
-    def camera_dod_gparam(self, dod_gate):
-        dod_dir = self.work_dir + f"dOD(gate={dod_gate})/camera/"
+            else:
+                if file in self.dod_cam_paths:
+                    file_name = "camera"
+                else:
+                    file_name = "scan"
 
-        with open(dod_dir + "dOD_fit.csv", 'w') as f:
-            f.write("z,dmuar,pixel,sigma_x,sigma_y,")
-            f.write("centroid_x,centroid_y,amplitude\n")
-
-        for pixelsize in range(self.pixel_min, self.pixel_max + 1):
-            for r in range(self.dmua_r_min, self.dmua_r_max + 1):
-                dod_map = dod_dir +\
-                          f"dOD(z={self.dmua_depth_init}+" +\
-                          f"{self.dmua_depth - 1},dmuar={r}," +\
-                          f"pixel={pixelsize}).csv"
-                dod = np.loadtxt(dod_map, delimiter=',')
-
-                try:
-                    popt = self.find_nearest_gaussian_param(dod)
-                except:
-                    continue
-
-                with open(dod_dir + "dOD_fit.csv", 'a') as f:
-                    f.write(f"{self.dmua_depth_init}+{self.dmua_depth - 1},")
-                    f.write(f"{r},{pixelsize},{popt[2]},{popt[3]},")
-                    f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
-
-    def scan_dod_gparam(self, dod_gate):
-        dod_dir = self.work_dir + f"dOD(gate={dod_gate})/scan/"
-
-        with open(dod_dir + "dOD_fit.csv", 'w') as f:
-            f.write("z,dmuar,interval,sigma_x,sigma_y,")
-            f.write("centroid_x,centroid_y,amplitude\n")
-
-        for int in range(self.interval_min, self.interval_max + 1):
-            for r in range(self.dmua_r_min, self.dmua_r_max + 1):
-                dod_map = dod_dir +\
-                          f"dOD(z={self.dmua_depth_init}+" +\
-                          f"{self.dmua_depth - 1},dmuar={r}," +\
-                          f"interval={int}).csv"
-                dod = np.loadtxt(dod_map, delimiter=',')
-
-                try:
-                    popt = self.find_nearest_gaussian_param(dod)
-                except:
-                    continue
-
-                with open(dod_dir + "dOD_fit.csv", 'a') as f:
-                    f.write(f"{self.dmua_depth_init}+{self.dmua_depth - 1},")
-                    f.write(f"{r},{int},{popt[2]},{popt[3]},")
-                    f.write(f"{popt[0]},{popt[1]},{popt[4]}\n")
-
-    # # illustrates the best-fit 2d gaussian distribution
-    # def draw_nearest_gaussian(self, dod_map):
-    #     dod = np.loadtxt(dod_map, delimiter=',')
-    #
-    #     try:
-    #         popt = self.find_nearest_gaussian_param(dod)
-    #     except:
-    #         return
+                with open(self.fit_dir + f"dod_{file_name}_fit.csv", 'a') as f:
+                    f.write(f"{gate},{time},{z},{dmuar},{interval},{popt[2]},")
+                    f.write(f"{popt[3]},{popt[0]},{popt[1]},{popt[4]}\n")
 
 
 def main():
@@ -138,15 +97,7 @@ def main():
     parser.add_argument('--dirname', type=str, default='data')
 
     fitter = Fitter(parser.parse_args())
-
-    # fitting tssp topography
-    fitter.tssp_gparam()
-
-    # fitting dod topography
-    gates = [12]
-    for gate in gates:
-        fitter.camera_dod_gparam(gate)
-        fitter.scan_dod_gparam(gate)
+    fitter.find_gparam()
 
 
 if __name__ == '__main__':
