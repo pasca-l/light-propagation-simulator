@@ -5,12 +5,13 @@ import numpy as np
 
 class SspTopography:
     def __init__(self, dirname):
-        self.work_dir = f"./results/{dirname}/"
+        self.work_dir = f"../results/{dirname}/"
 
         self.inputx = 61
         self.inputy = 61
         self.total_depth = 28
         self.total_gate = 16
+
         self.gate_width = 1
         self.depth_init = 14
         self.depth = 4
