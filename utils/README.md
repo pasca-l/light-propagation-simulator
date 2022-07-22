@@ -3,7 +3,7 @@
 ## Requirements
 
 ## Contents
-- [`topography_ssp.py`](#topography_ssppy)
+- [`topography_ssp.py`](#topography_dodpy)
 
 ## Usage
 ### [`topography_ssp.py`](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/topography_ssp.py)
