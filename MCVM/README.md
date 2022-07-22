@@ -3,22 +3,19 @@
 ## Contents
 ### Settings
 - settings.conf
-    - general settings for simulation
+  - general settings for simulation
 - model.conf
-    - model settings used in simulation
+  - model settings used in simulation
 
 ### Codes
 - montecarlo.c
-    - main simulation program
-- exec_montecarlo.sh
-    - runs: mkdir_data.py, montecarlo.c, push_data.py
-    - mkdir_data.py generates a temporal directory named "data" to save simulation results
-    - push_data.py moves completed simulation result to "results" directory
+  - main simulation program
+- run.py
+  - wrapper for simulation, dumps output in "results" directory giving a designated name.
 
-
-## How to use
-1. change settings in setting.conf, and model.conf to fit assuming condition
-2. execute exec_montecarlo.sh giving a directory name to save data into
+## Usage
+1. Change settings in setting.conf, and model.conf to fit assuming condition.
+2. Execute exec_montecarlo.sh giving a directory name to save data into. (Default data directory name is `data`)
 ```shell
-$ exec_montecarlo.sh SAVE_AS_DIR
+$ python run.py --save_name SAVE_NAME
 ```
