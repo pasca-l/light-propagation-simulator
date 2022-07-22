@@ -3,19 +3,30 @@
 ## Requirements
 
 
-## Usage
-- [`topography_ssp.py`](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/topography_ssp.py)
+## Short description and Usage
+---
+[`topography_ssp.py`](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/topography_ssp.py)
 
 Generates 2D topography image of (time-resolved) SSP using resulting csv file given from simulators.
 
-1. Modify 
+1. Modify instance variables.
+> Output of simulation gives the time-resolved SSP in the shape of ($z \times x \times y$) per gate, topography is given by summing up along certain dimensions.
+
+> Along the gate dimension, which is the time-resolution of measurement, is accumulated for `self.total_gate // self.gate_width` numbers of gate.
+
+> Along $z$, which is the depth of the model, is accumulated from `self.depth_init` to `self.depth_init + self.depth`.
+
+1. Run script, giving the name of the data directory in "results". (Default data directory name is `data`)
+```
+python topography_ssp.py --dirname DATA_DIRECTORY_NAME
+```
 
 ---
-- `topography_dod.py`
+`topography_dod.py`
 
 Generates topography image of dOD based on virtual absorption change area using resulting csv file given from simulators.
 
-
+---
 ### `get_profile.py`
 Cuts out values at specified axis of given image matrix.
 
