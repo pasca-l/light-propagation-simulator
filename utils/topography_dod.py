@@ -1,18 +1,20 @@
 import os
-import sys
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import interpolate
 
+
 class DodTopography:
-    def __init__(self, dirname, time_gate):
-        self.work_dir = f"./results/{dirname}/"
+    def __init__(self, args, time_gate):
+        self.work_dir = f"../results/{args.dirname}/"
         self.gate = time_gate
         self.dmua_map_check = False
 
         self.inputx = 61
         self.inputy = 61
         self.total_depth = 28
+
         self.dmua_depth_init = 14
         self.dmua_depth = 4
         self.dmua = 0.002
@@ -83,11 +85,6 @@ class DodTopography:
                 i, j = dety - half_inputy, detx - half_inputx
                 dod_map[i][j] = np.sum(ssp_with_buffer * relative_dmua_map)
 
-                if self.dmua_map_check:
-                    np.savetxt(self.dmua_dir + f"/dmua({i},{j}).csv",
-                               relative_dmua_map[29:90, 29:90],
-                               delimiter=',', fmt='%lf')
-
         return dod_map
 
     def replace_to_representative(self, dod_map, pixelsize):
@@ -121,7 +118,6 @@ class DodTopography:
 
         map_xaxis = np.arange(dod_map.shape[0])
         map_yaxis = np.arange(dod_map.shape[1])
-        map_xgrid, map_ygrid = np.meshgrid(map_xaxis, map_yaxis)
         dod_map = f(map_xaxis, map_yaxis)
 
         return dod_map
@@ -209,9 +205,12 @@ class DodTopography:
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dirname', type=str, default='data')
+
     gates = [12]
     for gate in gates:
-        topo = DodTopography(sys.argv[1], gate)
+        topo = DodTopography(parser.parse_args(), gate)
         topo.topography_of_dod()
         topo.topography_of_psf()
 
