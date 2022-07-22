@@ -14,8 +14,8 @@ class Profile:
         # x_axis (horizontal) = 0; y_axis (vertical) = 1
         self.profile_axis = 0
         self.profile_position = 30
-        os.makedirs(f"../results/{args.dirname}/profile/", exist_ok=True)
         self.profile_dir = f"../results/{args.dirname}/profile/"
+        os.makedirs(self.profile_dir, exist_ok=True)
 
     def tssp_profile(self):
         for file in self.paths:
