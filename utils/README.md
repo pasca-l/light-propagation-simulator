@@ -84,6 +84,10 @@ Fits gaussian distribution to given image matrix and returns optimized function 
 
 Plots gaussian distribution or image in 3D.
 
+1. Run script, giving the file path to show 3d plot.
+```
+python gaussian_3d_plot.py --filepath DATA_PATH
+```
 
 ---
 [***`deconvolute_topography.py`***](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/deconvolute_topography.py)
