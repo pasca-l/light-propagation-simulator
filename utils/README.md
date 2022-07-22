@@ -11,12 +11,11 @@ Generates 2D topography image of (time-resolved) SSP using resulting csv file gi
 
 1. Modify instance variables.
 > Output of simulation gives the time-resolved SSP in the shape of ($z \times x \times y$) per gate, topography is given by summing up along certain dimensions.
+>> Along the gate dimension, which is the time-resolution of measurement, is accumulated for `self.total_gate // self.gate_width` numbers of gate.
+>
+>> Along the $z$ dimension, which is the depth of the model, is accumulated from `self.depth_init` to `self.depth_init + self.depth`.
 
-> Along the gate dimension, which is the time-resolution of measurement, is accumulated for `self.total_gate // self.gate_width` numbers of gate.
-
-> Along $z$, which is the depth of the model, is accumulated from `self.depth_init` to `self.depth_init + self.depth`.
-
-1. Run script, giving the name of the data directory in "results". (Default data directory name is `data`)
+2. Run script, giving the name of the data directory in "results". (Default data directory name is `data`)
 ```
 python topography_ssp.py --dirname DATA_DIRECTORY_NAME
 ```

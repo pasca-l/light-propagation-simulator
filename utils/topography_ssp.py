@@ -1,11 +1,12 @@
 import os
-import sys
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 class SspTopography:
-    def __init__(self, dirname):
-        self.work_dir = f"../results/{dirname}/"
+    def __init__(self, args):
+        self.work_dir = f"../results/{args.dirname}/"
 
         self.inputx = 61
         self.inputy = 61
@@ -82,7 +83,10 @@ class SspTopography:
 
 
 def main():
-    topo = SspTopography(sys.argv[1])
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dirname', type=str, default='data')
+
+    topo = SspTopography(parser.parse_args())
     topo.topography_of_tssp()
 
 
