@@ -1,7 +1,9 @@
 # MonteCarlo simulation utilities
 
 ## Requirements
-
+- numpy 1.23.1
+- matplotlib 3.5.2
+- scipy 1.8.1
 
 ## Description and Usage
 ---

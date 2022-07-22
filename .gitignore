@@ -14,3 +14,5 @@ results/
 
 /venv/
 */venv/
+
+!requirements.txt
