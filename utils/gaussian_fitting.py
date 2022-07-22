@@ -1,11 +1,11 @@
-import sys
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.optimize as opt
 
 class Fitter:
-    def __init__(self, dirname):
-        self.work_dir = f"./results/{dirname}/"
+    def __init__(self, args):
+        self.work_dir = f"../results/{args.dirname}/"
 
         self.inputx = 61
         self.inputy = 61
@@ -134,7 +134,10 @@ class Fitter:
 
 
 def main():
-    fitter = Fitter(sys.argv[1])
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dirname', type=str, default='data')
+
+    fitter = Fitter(parser.parse_args())
 
     # fitting tssp topography
     fitter.tssp_gparam()

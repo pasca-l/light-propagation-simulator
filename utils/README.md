@@ -78,6 +78,7 @@ python get_profile.py --dirname DATA_DIRECTORY_NAME
 
 Fits gaussian distribution to given image matrix and returns optimized function parameters.
 
+### **STILL WORKING**
 
 ---
 [***`gaussian_3d_plot.py`***](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/gaussian_3d_plot.py)
@@ -93,3 +94,5 @@ python gaussian_3d_plot.py --filepath DATA_PATH
 [***`deconvolute_topography.py`***](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/deconvolute_topography.py)
 
 Deconvolutes given dOD by SSP, by simple division in frequency domain.
+
+### **STILL WORKING**
