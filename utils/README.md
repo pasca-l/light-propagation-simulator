@@ -17,7 +17,7 @@ Generates 2D topography image of (time-resolved) SSP using resulting csv file gi
 
 2. Run script, giving the name of the data directory in "results". (Default data directory name is `data`)
 ```
-python topography_ssp.py --dirname DATA_DIRECTORY_NAME
+$ python topography_ssp.py --dirname DATA_DIRECTORY_NAME
 ```
 
 > Output of this script is put into a directory named `tssp_topography(gatewidth=...)` with files named `tssp(gate=...,z=...)`.
@@ -47,7 +47,7 @@ Generates topography image of dOD based on virtual absorption change area using 
 
 2. Run script, giving the name of the data directory in "results". (Default data directory name is `data`)
 ```
-python topography_ssp.py --dirname DATA_DIRECTORY_NAME
+$ python topography_ssp.py --dirname DATA_DIRECTORY_NAME
 ```
 
 > Output of this script is put into a directory named `dOD(gate=...)`, with files named:
@@ -68,7 +68,7 @@ Slice out values at specified axis of given image matrix.
 
 2. Run script, giving the name of the data directory in "results". (Default data directory name is `data`)
 ```
-python get_profile.py --dirname DATA_DIRECTORY_NAME
+$ python get_profile.py --dirname DATA_DIRECTORY_NAME
 ```
 
 > The operation in the script is applied to all files under the directory named `tssp_topography(gatewidth=...)`, and the output is put into a directory named `profile` with files named `profile(gate=...,z=...,axis=...,position=...)`.
@@ -87,7 +87,7 @@ Plots gaussian distribution or image in 3D.
 
 1. Run script, giving the file path to show 3d plot.
 ```
-python gaussian_3d_plot.py --filepath DATA_PATH
+$ python gaussian_3d_plot.py --filepath DATA_PATH
 ```
 
 ---
