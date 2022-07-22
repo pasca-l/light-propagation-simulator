@@ -4,11 +4,11 @@
 
 
 ## Contents
-- [`topography_ssp.py`](#topography_ssp)
+- [`topography_ssp.py`](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/topography_ssp.py)
 
 
 ## Usage
-### <h2 id="topography_ssp">`topography_ssp.py`</h2>
+### `topography_ssp.py`
 Generates 2D topography image of (time-resolved) SSP using resulting csv file given from simulators.
 
 1. Modify 
