@@ -5,6 +5,7 @@ import re
 import numpy as np
 import scipy.optimize as opt
 
+
 class Fitter:
     def __init__(self, args):
         self.work_dir = f"../results/{args.dirname}/"
