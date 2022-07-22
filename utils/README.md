@@ -82,6 +82,7 @@ Fits gaussian distribution to given image matrix and returns optimized function 
 ```
 $ python topography_ssp.py --dirname DATA_DIRECTORY_NAME
 ```
+
 > All files related to topography under the directory named `tssp_topography(gatewidth=...)`, `dOD(gate=...)` are searched, and the output is put into a directory named `fit` with files named `tssp_fit`, `dod_camera_fit`, `dod_scan_fit`.
 
 ---
@@ -97,6 +98,12 @@ $ python gaussian_3d_plot.py --filepath DATA_PATH
 ---
 [***`deconvolute_topography.py`***](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/deconvolute_topography.py)
 
-Deconvolutes given dOD by SSP, by simple division in frequency domain.
+Deconvolutes given dOD by PSF, by simple division in frequency domain.
 
-### **STILL WORKING**
+1. Run script, giving:
+  - the name of the data directory in "results". (Default data directory name is `data`)
+  - the path for dOD map to deconvolve. (required)
+  - the path for PSF map as divider. (required)
+```
+$ python topography_ssp.py --dirname DATA_DIRECTORY_NAME --dod_map_path PATH_TO_DOD_MAP --psf_map_path PATH_TO_PSF_MAP
+```
