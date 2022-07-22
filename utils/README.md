@@ -2,16 +2,17 @@
 
 ## Requirements
 
-## Contents
-- [`topography_ssp.py`](#topography_dodpy)
 
 ## Usage
-### [`topography_ssp.py`](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/topography_ssp.py)
+- [`topography_ssp.py`](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/topography_ssp.py)
+
 Generates 2D topography image of (time-resolved) SSP using resulting csv file given from simulators.
 
 1. Modify 
 
-### `topography_dod.py`
+---
+- `topography_dod.py`
+
 Generates topography image of dOD based on virtual absorption change area using resulting csv file given from simulators.
 
 
