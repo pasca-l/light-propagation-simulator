@@ -23,7 +23,7 @@ python topography_ssp.py --dirname DATA_DIRECTORY_NAME
 > Output of this script is put into a directory named `tssp_topography(gatewidth=...)` with files named `tssp(gate=...,z=...)`.
 
 ---
-[`topography_dod.py`](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/topography_dod.py)
+[***`topography_dod.py`***](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/topography_dod.py)
 
 Generates topography image of dOD based on virtual absorption change area using resulting csv file given from simulators.
 
@@ -56,23 +56,36 @@ python topography_ssp.py --dirname DATA_DIRECTORY_NAME
 > 3. `PSF(z=...)` directly below
 
 ---
-[`get_profile.py`](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/get_profile.py)
+[***`get_profile.py`***](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/get_profile.py)
 
-Cuts out values at specified axis of given image matrix.
+Slice out values at specified axis of given image matrix.
+
+0. "results" folder should contain SSP topographies, given from `topography_ssp.py`.
+1. Modify instance variables.
+> Profile is given by designating:
+> - `self.profile_axis`, the direction of the slice
+> - `self.profile_position`, the position on the axis to slice
+
+2. Run script, giving the name of the data directory in "results". (Default data directory name is `data`)
+```
+python get_profile.py --dirname DATA_DIRECTORY_NAME
+```
+
+> The operation in the script is applied to all files under the directory named `tssp_topography(gatewidth=...)`, and the output is put into a directory named `profile` with files named `profile(gate=...,z=...,axis=...,position=...)`.
 
 ---
-[`gaussian_fitting.py`](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/gaussian_fitting.py)
+[***`gaussian_fitting.py`***](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/gaussian_fitting.py)
 
 Fits gaussian distribution to given image matrix and returns optimized function parameters.
 
 
 ---
-[`gaussian_3d_plot.py`](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/gaussian_3d_plot.py)
+[***`gaussian_3d_plot.py`***](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/gaussian_3d_plot.py)
 
 Plots gaussian distribution or image in 3D.
 
 
 ---
-[`deconvolute_topography.py`](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/deconvolute_topography.py)
+[***`deconvolute_topography.py`***](https://github.com/pasca-l/light-propagation-simulator/blob/main/utils/deconvolute_topography.py)
 
 Deconvolutes given dOD by SSP, by simple division in frequency domain.
