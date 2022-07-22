@@ -11,4 +11,5 @@
 *.xlsx
 *.out
 
+/venv/
 */venv/
