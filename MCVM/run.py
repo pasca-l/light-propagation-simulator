@@ -21,6 +21,12 @@ def main():
     subprocess.run('./a.out', shell=True)
     os.remove("./a.out")
 
+    # remove unnecessary files (used to resume simulation)
+    os.remove("../data/temporary_note.txt")
+    os.remove("../data/data.bin")
+    os.remove("../data/pd.bin")
+    os.remove("../data/ssp.bin")
+
     # move generated data into "results" folder
     os.rename("../data/", args.save_name)
     os.makedirs("../results/", exist_ok=True)
