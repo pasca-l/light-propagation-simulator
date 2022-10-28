@@ -34,10 +34,10 @@ static FILE *fp_base, *fp_model, *fp_note, *fp_data, *fp_pd, *fp_path, *fp_com;
 static string baseconf   = "settings.conf";
 static string modelconf  = "model.conf";
 static string note       = "../data/temporary_note.txt";
-static string datafile   = "../data/binary.data";
-static string pdfile     = "../data/binary.pd";
-static string pathfile   = "../data/binary.ssp";
-static string comfile    = "../data/summary.com";
+static string datafile   = "../data/data.bin";
+static string pdfile     = "../data/pd.bin";
+static string pathfile   = "../data/ssp.bin";
+static string comfile    = "../data/summary.txt";
 
 static FILE *fp_int, *fp_pathl, *fp_tpathl, *fp_ssp, *fp_tssp;
 static string intfile    = "../data/intensity.csv";
