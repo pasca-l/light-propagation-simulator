@@ -30,8 +30,15 @@ class Fitter:
             f.write("gate,time,z,dmuar,interval,sigma_x,sigma_y,")
             f.write("centroid_x,centroid_y,amplitude\n")
 
-        self.inputx = 61
-        self.inputy = 61
+        self._get_model_param_from_summary()
+
+    def _get_model_param_from_summary(self):
+        with open(self.work_dir + "summary.txt") as f:
+            txt = "".join(f.readlines())
+
+        model_size_str = re.findall(r'model size\s*: \((.*)\)\n', txt).pop()
+        model_size = list(map(int, re.findall(r'= (\d*)', model_size_str)))
+        self.inputx, self.inputy, _ = model_size
 
     def twoD_gaussian(self, coord, cen_x, cen_y, sig_x, sig_y, amp):
         x, y = coord
@@ -95,7 +102,7 @@ class Fitter:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dirname', type=str, default='data')
+    parser.add_argument('-d', '--dirname', type=str, default='data')
 
     fitter = Fitter(parser.parse_args())
     fitter.find_gparam()

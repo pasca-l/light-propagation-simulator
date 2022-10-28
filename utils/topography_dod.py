@@ -1,36 +1,31 @@
 import os
 import argparse
+import re
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import interpolate
 
 
 class DodTopography:
-    def __init__(self, args, time_gate):
+    def __init__(self, args):
         self.work_dir = f"../results/{args.dirname}/"
-        self.gate = time_gate
-        self.dmua_map_check = False
+        self.gate = args.gate_at
+        self.dmua_map_check = args.map_check
 
-        self.inputx = 61
-        self.inputy = 61
-        self.total_depth = 28
+        self.dmua_depth_init = args.dmua_init
+        self.dmua_depth = args.dmua_depth
+        self.dmua = args.dmua
+        self.dmua_r = args.dmua_r
 
-        self.dmua_depth_init = 14
-        self.dmua_depth = 4
-        self.dmua = 0.002
-        self.dmua_r_min = 1
-        self.dmua_r_max = 15
+        self.pixel = args.pixel
+        self.interval = args.interval
 
-        self.pixel_min = 1
-        self.pixel_max = 6
-        self.interval_min = 1
-        self.interval_max = 6
+        self._get_model_param_from_summary()
 
-        self.ssp_map = np.loadtxt(self.work_dir +
-                                  f"tssp_map/tssp(gate={self.gate}).csv",
-                                  skiprows=2, delimiter=',')
-        self.ssp = np.reshape(self.ssp_map,
-                              (self.total_depth, self.inputx, self.inputy))
+        ssp_map = np.loadtxt(self.work_dir +
+                             f"tssp_map/tssp(gate={self.gate}).csv",
+                             skiprows=2, delimiter=',')
+        self.ssp = ssp_map.reshape(self.total_depth, self.inputx, self.inputy)
 
         self.dod_dir = self.work_dir + f"dOD(gate={self.gate})/"
         if not os.path.exists(self.dod_dir):
@@ -40,6 +35,14 @@ class DodTopography:
             self.dmua_dir = self.dod_dir + "dmua_map/"
             if not os.path.exists(self.dmua_dir):
                 os.makedirs(self.dmua_dir)
+
+    def _get_model_param_from_summary(self):
+        with open(self.work_dir + "summary.txt") as f:
+            txt = "".join(f.readlines())
+
+        model_size_str = re.findall(r'model size\s*: \((.*)\)\n', txt).pop()
+        model_size = list(map(int, re.findall(r'= (\d*)', model_size_str)))
+        self.inputx, self.inputy, self.total_depth = model_size
 
     def add_surrounding_zeros(self, matrix):
         row, col = map(int, matrix.shape)
@@ -54,7 +57,8 @@ class DodTopography:
 
         return output
 
-    def create_dmua_map(self, ssp_map, r):
+    def create_dmua_map(self, ssp_map):
+        r = self.dmua_r
         dmua_map = np.zeros_like(ssp_map)
         ymid, xmid = map(lambda f: int(f/2), dmua_map.shape)
 
@@ -87,30 +91,21 @@ class DodTopography:
 
         return dod_map
 
-    def replace_to_representative(self, dod_map, pixelsize):
-        offset = pixelsize // 2
-        for y in range(offset, self.inputy, pixelsize):
-            for x in range(offset, self.inputx, pixelsize):
+    def replace_to_representative(self, dod_map):
+        offset = self.pixel // 2
+        for y in range(offset, self.inputy, self.pixel):
+            for x in range(offset, self.inputx, self.pixel):
                 rep = dod_map[y][x]
-                if pixelsize % 2 == 1:
+                if self.pixel % 2 == 1:
                     dod_map[y-offset:y+offset+1, x-offset:x+offset+1] = rep
-                elif pixelsize % 2 == 0:
+                elif self.pixel % 2 == 0:
                     dod_map[y-offset:y+offset, x-offset:x+offset] = rep
 
         return dod_map
 
-    def spline_complement(self, dod_map, intervalsize):
-        # image of scanned measurement points
-        # mask = np.zeros_like(dod_map)
-        # for y in range(0, mask.shape[1], intervalsize):
-        #     for x in range(0, mask.shape[0], intervalsize):
-        #         data_xaxis =
-        #         mask[x, y] = 1
-        # mask = mask * dod_map
-        # return mask
-
-        data_xaxis = np.arange(0, dod_map.shape[0], intervalsize)
-        data_yaxis = np.arange(0, dod_map.shape[1], intervalsize)
+    def spline_complement(self, dod_map):
+        data_xaxis = np.arange(0, dod_map.shape[0], self.interval)
+        data_yaxis = np.arange(0, dod_map.shape[1], self.interval)
         data_xgrid, data_ygrid = np.meshgrid(data_xaxis, data_yaxis)
         data = dod_map[data_xgrid, data_ygrid]
 
@@ -122,11 +117,7 @@ class DodTopography:
 
         return dod_map
 
-    def make_topography(self, dod_map, save_name, csv_flag=True,
-                        norm_flag=False, raw_image=False):
-        if csv_flag:
-            np.savetxt(save_name + ".csv", dod_map, delimiter=',', fmt='%lf')
-
+    def make_topography(self, dod_map, save_name, norm_flag=False, raw=False):
         image = np.zeros_like(dod_map)
         image = dod_map
         if norm_flag:
@@ -134,7 +125,7 @@ class DodTopography:
                 image = dod_map / dod_map.max()
 
         # save image without axis and legend
-        if raw_image:
+        if raw:
             plt.imsave(save_name + "_img.png", image, cmap='jet')
 
         # save image with axis and legend
@@ -151,49 +142,47 @@ class DodTopography:
         plt.clf()
         plt.close()
 
-    def topography_of_dod(self, camera=True, spline=True):
+    def topography_of_dod(self, camera=True, spline=True, csv_flag=False):
         ssp_with_buffer = np.zeros((2 * self.inputx - 1, 2 * self.inputy - 1))
-        for z in range(self.dmua_depth_init,
-                       self.dmua_depth_init + self.dmua_depth):
-            ssp_with_buffer += self.add_surrounding_zeros(self.ssp[z])
+        for z in range(self.dmua_depth):
+            ssp_with_buffer +=\
+                self.add_surrounding_zeros(self.ssp[self.dmua_depth_init + z])
 
-        for r in range(self.dmua_r_min, self.dmua_r_max + 1):
-            dmua_map = self.create_dmua_map(ssp_with_buffer, r)
-            zeros = np.zeros((self.inputx, self.inputy))
+        dmua_map = self.create_dmua_map(ssp_with_buffer)
+        zeros = np.zeros((self.inputx, self.inputy))
+        dod_map = self.convolute_maps(zeros, dmua_map, ssp_with_buffer)
 
-            if camera:
-                dod_map = self.convolute_maps(zeros, dmua_map, ssp_with_buffer)
+        if camera:
+            camera_dir = self.dod_dir + "camera/"
+            if not os.path.exists(camera_dir):
+                os.makedirs(camera_dir)
 
-                camera_dir = self.dod_dir + "camera/"
-                if not os.path.exists(camera_dir):
-                    os.makedirs(camera_dir)
+            dod_topo = self.replace_to_representative(dod_map)
 
-                for pixel in range(self.pixel_min, self.pixel_max + 1):
-                    dod_topo = self.replace_to_representative(dod_map, pixel)
+            save_as = camera_dir + f"dOD(z={self.dmua_depth_init}+" +\
+                      f"{self.dmua_depth - 1},dmuar={self.dmua_r}," +\
+                      f"pixel={self.pixel})"
+            self.make_topography(dod_topo, save_as)
 
-                    save_as = camera_dir + f"dOD(z={self.dmua_depth_init}+" +\
-                             f"{self.dmua_depth - 1},dmuar={r},pixel={pixel})"
-                    self.make_topography(dod_topo, save_as)
+        if spline:
+            scan_dir = self.dod_dir + "scan/"
+            if not os.path.exists(scan_dir):
+                os.makedirs(scan_dir)
 
-            if spline:
-                dod_map = self.convolute_maps(zeros, dmua_map, ssp_with_buffer)
+            dod_topo = self.spline_complement(dod_map)
 
-                scan_dir = self.dod_dir + "scan/"
-                if not os.path.exists(scan_dir):
-                    os.makedirs(scan_dir)
+            save_as = scan_dir + f"dOD(z={self.dmua_depth_init}+" +\
+                      f"{self.dmua_depth - 1},dmuar={self.dmua_r}," +\
+                      f"interval={self.interval})"
 
-                for int in range(self.interval_min, self.interval_max + 1):
-                    dod_topo = self.spline_complement(dod_map, int)
+        if csv_flag:
+            np.savetxt(f"{save_as}.csv", dod_map, delimiter=',', fmt='%lf')
+        self.make_topography(dod_topo, save_as)
 
-                    save_as = scan_dir + f"dOD(z={self.dmua_depth_init}+" +\
-                            f"{self.dmua_depth - 1},dmuar={r},interval={int})"
-                    self.make_topography(dod_topo, save_as)
-
-    def topography_of_psf(self):
+    def topography_of_psf(self, csv_flag=False):
         psf_map = np.zeros((self.inputx, self.inputy))
-        for z in range(self.dmua_depth_init,
-                       self.dmua_depth_init + self.dmua_depth):
-            psf_map += self.ssp[z]
+        for z in range(self.dmua_depth):
+            psf_map += self.ssp[self.dmua_depth_init + z]
 
         psf_mua_map = np.empty_like(psf_map)
         psf_mua_map.fill(self.dmua)
@@ -201,18 +190,26 @@ class DodTopography:
 
         save_as = self.dod_dir +\
                   f"PSF(z={self.dmua_depth_init}+{self.dmua_depth - 1})"
+        if csv_flag:
+            np.savetxt(f"{save_as}.csv", psf_map, delimiter=',', fmt='%lf')
         self.make_topography(psf_map, save_as)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dirname', type=str, default='data')
+    parser.add_argument('-d', '--dirname', type=str, default='data')
+    parser.add_argument('-g', '--gate_at', type=int, default=12)
+    parser.add_argument('-p', '--pixel', type=int, default=1)
+    parser.add_argument('-i', '--interval', type=int, default=1)
+    parser.add_argument('-r', '--dmua_r', type=int, default=1)
+    parser.add_argument('-z', '--dmua_init', type=int, default=14)
+    parser.add_argument('-w', '--dmua_depth', type=int, default=4)
+    parser.add_argument('-m', '--dmua', type=float, default=0.002)
+    parser.add_argument('-c', '--map_check', action='store_true')
 
-    gates = [12]
-    for gate in gates:
-        topo = DodTopography(parser.parse_args(), gate)
-        topo.topography_of_dod()
-        topo.topography_of_psf()
+    topo = DodTopography(parser.parse_args())
+    topo.topography_of_dod()
+    topo.topography_of_psf()
 
 
 if __name__ == '__main__':

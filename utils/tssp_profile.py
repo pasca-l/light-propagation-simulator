@@ -10,10 +10,8 @@ class Profile:
         self.work_dir = f"../results/{args.dirname}/"
         self.paths = glob.glob(self.work_dir + "tssp_topography*/*.csv")
 
-        # direction to take profile
-        # x_axis (horizontal) = 0; y_axis (vertical) = 1
-        self.profile_axis = 0
-        self.profile_position = 30
+        self.profile_axis = args.axis
+        self.profile_position = args.position
         self.profile_dir = f"../results/{args.dirname}/profile/"
         os.makedirs(self.profile_dir, exist_ok=True)
 
@@ -39,7 +37,9 @@ class Profile:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dirname', type=str, default='data')
+    parser.add_argument('-d', '--dirname', type=str, default='data')
+    parser.add_argument('-a', '--axis', type=int, default=0)
+    parser.add_argument('-p', '--position', type=int, default=30)
 
     genprofile = Profile(parser.parse_args())
     genprofile.tssp_profile()
