@@ -30,8 +30,7 @@ Calculates intensity and partial path length with given settings and model
 #define STRSIZE 50
 typedef char string[STRSIZE];
 
-static FILE *fp_base, *fp_model, *fp_note, *fp_data, *fp_pd, *fp_path, *fp_com;
-static string baseconf   = "settings.conf";
+static FILE *fp_model, *fp_note, *fp_data, *fp_pd, *fp_path, *fp_com;
 static string modelconf  = "model.conf";
 static string note       = "../data/temporary_note.txt";
 static string datafile   = "../data/data.bin";
@@ -52,19 +51,21 @@ static string tsspfile   = "../data/tssp_map/tssp";
 #define MAX_LAYER   5        /* number of layers in model*/
 
 #define SCALE       1.0      /* size of pixel*/
-
 #define MAX_X       30       /* data save x (-MAX_X < MAX_X)*/
 #define MAX_Y       30       /* data save y (-MAX_Y < MAX_Y)*/
 #define MAX_Z       28       /* data save z (0 < MAX_Z)*/
 
 #define MT          400      /* number of division for TR path length */
 #define DT          10       /* time(ps) per division */
-#define MT_PD       80       /* number of division for TR photon density*/
+#define MT_PD       80       /* number of division for TR photon density */
 #define DT_PD       50       /* time(ps) per division */
 #define MT_SSP      16       /* number of division for TR SS profile */
 #define DT_SSP      250      /* time(ps) per division */
+
+#define G           0.0      /* mean cosine of phase function */
 #define INT_CUT     0.0001   /* cutoff intensity for weight */
-#define MAX_SCATTER 100000
+#define MAX_SCATTER 100000   /* max scatter count for cutoff */
+#define MAX_PATHLEN 2000     /* max path length for cutoff */
 /* ======================================================================== */
 
 /* global variables as constants ========================================== */
@@ -94,10 +95,8 @@ static int randnum_counter = 0;
 /* ======================================================================== */
 
 /* variables to read from file ============================================ */
-static char                   is_newfile;  /* if new file (y/n) */
+static int                    is_newfile;  /* if new file (y/n) */
 static unsigned long long int phot_input;  /* total number of input photons */
-static double                 g;           /* mean cosine of phase function */
-static double                 maxpath;     /* max pathlength for cutoff */
 
 static double source_NA;
 static double source_minrad;
@@ -153,6 +152,7 @@ static double path_for_ssp[MAX_Z][MAX_X*2+1][MAX_Y*2+1];
 
 /* variables for precalculation =========================================== */
 #define TABLEN  10000 /* size of table */
+#define REF_FG  1     /* type of reflection; 0: no ref, 1: ref, 2: ??? */
 #define REF_IND 1.4
 
 static double stepsize_table[TABLEN];
@@ -165,7 +165,6 @@ static double sinthe[TABLEN];
 static double cospsi[TABLEN];
 static double sinpsi[TABLEN];
 
-static int ref_fg;
 static double ref_in[1001];
 static double ref_out[1001];
 /* ======================================================================== */
@@ -219,14 +218,17 @@ static void MonteCarlo();
 /* ======================================================================== */
 
 
-int main(void){
+int main(int argc, char *argv[]){
+    is_newfile = atoi(argv[1]);
+    phot_input = atoll(argv[2]);
+
     LoadSettings();
 
-    if(is_newfile == 'n'){
-        LoadData();
+    if(is_newfile){
+        InitData();
     }
     else{
-        InitData();
+        LoadData();
     }
 
     PreCalculatedTable();
@@ -242,21 +244,10 @@ int main(void){
 
 void LoadSettings(){
     /* error handling for non existing files or content */
-    if((fp_base = fopen(baseconf, "r")) == NULL){
-        fprintf(stderr, "%s not found or no content\n", baseconf);
-        exit(1);
-    }
     if((fp_model = fopen(modelconf, "r")) == NULL){
         fprintf(stderr, "%s not found or no content\n", modelconf);
         exit(1);
     }
-
-    /* values of settings.conf */
-    fscanf(fp_base, "%c%*[^\n]%*c", &is_newfile);
-    fscanf(fp_base, "%llu%*[^\n]%*c", &phot_input);
-    fscanf(fp_base, "%lf%*[^\n]%*c", &g);
-    fscanf(fp_base, "%d%*[^\n]%*c", &ref_fg);
-    fscanf(fp_base, "%lf%*[^\n]%*c", &maxpath);
 
     /* values of model.conf */
     fscanf(fp_model, "%lf%*[^\n]%*c", &source_NA);
@@ -288,7 +279,6 @@ void LoadSettings(){
         mut[i] = mus[i] + mua[i];
     }
 
-    fclose(fp_base);
     fclose(fp_model);
 }
 
@@ -391,24 +381,34 @@ void Summary(){
     fprintf(fp_com, "over scatter photons %12llu\n", phot_overscat);
     fprintf(fp_com, "time taken : %dD, %dH, %dM, %lluS\n\n",day,hour,min,sec);
 
+    fprintf(fp_com, "model size     : (x = %d, y = %d, z = %d)\n",
+            MAX_X * 2 + 1, MAX_Y * 2 + 1, MAX_Z);
+    fprintf(fp_com, "pixel size     : %.1f\n", SCALE);
+    fprintf(fp_com, "phase function : g = %.1lf\n\n", G);
+
     fprintf(fp_com, "layer width mus mua\n");
     for(int i = 0; i < MAX_LAYER; i++){
         fprintf(fp_com, "%d %d %.4f %.4f\n", i, width[i], mus[i], mua[i]);
     }
 
-    fprintf(fp_com, "\nphase function:  g = %.1lf\n", g);
-    fprintf(fp_com, "source NA:       %.1f\n", source_NA);
-    fprintf(fp_com, "source radius:   Min = %.1f\tMax = %.1f\n",
+    fprintf(fp_com, "\nsource NA      : %.1f\n", source_NA);
+    fprintf(fp_com, "source radius    : Min = %.1f\tMax = %.1f\n",
             source_minrad, source_maxrad);
-    fprintf(fp_com, "source:          (x = %.1f, y = %.1f, z = %.1f)\n",
+    fprintf(fp_com, "source           : (x = %.1f, y = %.1f, z = %.1f)\n",
             source_x, source_y, source_z);
-    fprintf(fp_com, "detector NA:     %.1f\n", detector_NA);
-    fprintf(fp_com, "detector radius: Min = %.1f\tMax = %.1f\n",
+    fprintf(fp_com, "detector NA      : %.1f\n", detector_NA);
+    fprintf(fp_com, "detector radius  : Min = %.1f\tMax = %.1f\n",
             detector_minrad, detector_maxrad);
     for(int i = 0; i < MAX_DET; i++){
-        fprintf(fp_com, "detector[%d]:     (x = %.1f, y = %.1f, z = %.1f)\n",
+        fprintf(fp_com, "detector[%d] : (x = %.1f, y = %.1f, z = %.1f)\n",
                 i, detector_x[i], detector_y[i], detector_z[i]);
     }
+
+    fprintf(fp_com, "\nmaximum record time (ps)  : %d\n", MT * DT);
+    fprintf(fp_com, "intensity gate number     : %d\n", MT_PD);
+    fprintf(fp_com, "intensity gate width (ps) : %d\n", DT_PD);
+    fprintf(fp_com, "TSSP gate number          : %d\n", MT_SSP);
+    fprintf(fp_com, "TSSP gate width (ps)      : %d\n", DT_SSP);
 
     if(stop_fg == TRUE){
         fprintf(fp_com, "\nCOMPLETED");
@@ -511,7 +511,6 @@ void SaveDataAsCsv(){
         fprintf(stderr, "%s can not open\n", pathlfile);
         exit(1);
     }
-
     fprintf(fp_pathl, "layer,path length\n");
     for(int i = 0; i < MAX_LAYER; i++){
         for(int j = 0; j < MAX_DET; j++){
@@ -684,13 +683,13 @@ void PreCalculatedTable(){
 
     /* table for reflection */
     double t1, t2, t3, t4, th1, th2;
-    if(ref_fg == 0){
+    if(REF_FG == 0){
         for(int i = 0; i <= 1000; i++){
             ref_in[i] = 0;
             ref_out[i] = 0;
         }
     }
-    else if(ref_fg == 1){
+    else if(REF_FG == 1){
         t1 = (REF_IND - 1) / (REF_IND + 1);
 
         ref_in[0] = 1;
@@ -731,7 +730,7 @@ void PreCalculatedTable(){
             }
         }
     }
-    else if(ref_fg == 2){
+    else if(REF_FG == 2){
         for(int i = 0; i <= 1000; i++){
             ref_in[i] = 0;
             t1 = (double) i / 1000;
@@ -745,7 +744,7 @@ void PreCalculatedTable(){
         }
     }
     else{
-        printf("error: value of ref_fg not valid\n");
+        printf("error: value of REF_FG not valid\n");
         exit(1);
     }
 
@@ -754,16 +753,16 @@ void PreCalculatedTable(){
     for(int i = 0; i <= TABLEN; i++){
         theta = (double) i / TABLEN;
 
-        if(g == 0){
+        if(G == 0){
             costhe[i] = 1 - 2 * theta;
             sinthe[i] = sqrt(1 - costhe[i] * costhe[i]);
         }
         else{
-            c1 = 1 + g * g;
-            c2 = (1 - g * g) * (1 - g * g);
-            c3 = (1 + g - 2 * g * theta) * (1 + g - 2 * g * theta);
+            c1 = 1 + G * G;
+            c2 = (1 - G * G) * (1 - G * G);
+            c3 = (1 + G - 2 * G * theta) * (1 + G - 2 * G * theta);
 
-            costhe[i] = (c1 - c2 / c3) / (2 * g);
+            costhe[i] = (c1 - c2 / c3) / (2 * G);
             if(1 - costhe[i] * costhe[i] <= 0){
                 sinthe[i] = 0;
             }
@@ -873,7 +872,7 @@ void NewDirection(){
     r1 = (long) (GenRand() * ((double) TABLEN - 1));
     r2 = (long) (GenRand() * ((double) TABLEN - 1));
 
-    if(g == 0){
+    if(G == 0){
         dx = sinthe[r1] * cospsi[r2];
         dy = sinthe[r1] * sinpsi[r2];
         dz = costhe[r1];
@@ -1353,7 +1352,7 @@ void MonteCarlo(){
             /* when photon exits */
             if(znew < 0){
                 FixPath();
-                if (ref_fg == 1){
+                if (REF_FG == 1){
                     CalculateRef();
                 }
                 else{
@@ -1376,7 +1375,7 @@ void MonteCarlo(){
                 phot_overtime++;
                 walk_fg = FALSE;
             }
-            else if(totalpath * SCALE >= maxpath){
+            else if(totalpath * SCALE >= MAX_PATHLEN){
                 phot_overpath++;
                 walk_fg = FALSE;
             }
