@@ -13,11 +13,10 @@
 
 ## Usage
 1. Change settings in `model.conf` to fit assuming condition.
-2. Execute `run.py` giving a directory name to save data into. (Default data directory name is `data`)
+2. Execute `run.py` giving options below:
+    - `-s` or `--save_name` for designating name of the resulting folder. (Default to `data`)
+    - `-i` or `--photons_in` for designating total number of input photons to simulate. (Default to `10000`)
+    - `-n` or `--new` to start simulation from scratch.
 ```shell
 $ python run.py [-s SAVE_NAME] [-i INPUT_PHOTON_NUM] [-n]
 ```
-> Options:
-> - `-s` or `--save_name` for designating name of the resulting folder.
-> - `-i` or `--photons_in` for designating total number of input photons to simulate.
-> - `-n` or `--new` to start simulation from scratch.
